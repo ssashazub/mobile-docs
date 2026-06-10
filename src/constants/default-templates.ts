@@ -140,11 +140,72 @@ const TEMPLATE_CONTENT: Record<
       ],
     },
   },
+  en: {
+    contract: {
+      title: 'Contract',
+      fields: [
+        { key: 'title', label: 'Contract title', placeholder: 'Service agreement', required: true },
+        { key: 'contractNumber', label: 'Contract number', placeholder: 'AGR-2026/014' },
+        { key: 'client', label: 'Client', placeholder: 'Company LLC', required: true },
+        { key: 'clientAddress', label: 'Client address', placeholder: 'Kyiv, Example St, 1' },
+        { key: 'provider', label: 'Provider', placeholder: 'John Smith' },
+        { key: 'providerAddress', label: 'Provider address', placeholder: 'Kyiv, Business St, 10' },
+        { key: 'subject', label: 'Contract subject', placeholder: 'Mobile app development', multiline: true },
+        { key: 'amount', label: 'Amount', placeholder: '50,000 UAH' },
+        { key: 'startDate', label: 'Start date', placeholder: '03/01/2026' },
+        { key: 'endDate', label: 'End date', placeholder: '06/30/2026' },
+        { key: 'terms', label: 'Terms and obligations', placeholder: '50% upfront payment, 50% upon completion...', multiline: true },
+      ],
+    },
+    invoice: {
+      title: 'Invoice',
+      fields: [
+        { key: 'title', label: 'Invoice title', placeholder: 'Invoice for services', required: true },
+        { key: 'invoiceNumber', label: 'Invoice number', placeholder: 'INV-0042' },
+        { key: 'client', label: 'Payer', placeholder: 'Client LLC', required: true },
+        { key: 'clientAddress', label: 'Payer address', placeholder: 'Kyiv, Victory Ave, 25' },
+        { key: 'provider', label: 'Recipient', placeholder: 'John Smith' },
+        { key: 'items', label: 'Items and services', placeholder: 'Development — 40,000 UAH\nDesign — 10,000 UAH', multiline: true },
+        { key: 'amount', label: 'Amount excl. VAT', placeholder: '50,000 UAH' },
+        { key: 'tax', label: 'VAT', placeholder: '10,000 UAH (20%)' },
+        { key: 'total', label: 'Total due', placeholder: '60,000 UAH' },
+        { key: 'dueDate', label: 'Payment due date', placeholder: 'by 03/15/2026' },
+        { key: 'bankDetails', label: 'Bank details', placeholder: 'IBAN: UA00...', multiline: true },
+      ],
+    },
+    report: {
+      title: 'Report',
+      fields: [
+        { key: 'title', label: 'Report title', placeholder: 'Work progress report', required: true },
+        { key: 'reportNumber', label: 'Report number', placeholder: 'REP-2026/03' },
+        { key: 'client', label: 'Client or project', placeholder: 'Mobile Docs project', required: true },
+        { key: 'period', label: 'Period', placeholder: 'March 2026' },
+        { key: 'author', label: 'Author', placeholder: 'Development team' },
+        { key: 'summary', label: 'Summary', placeholder: 'Main tasks of phase 1 have been completed...', multiline: true },
+        { key: 'conclusions', label: 'Conclusions', placeholder: 'The project is on schedule...', multiline: true },
+        { key: 'recommendations', label: 'Recommendations', placeholder: 'It is recommended to expand testing...', multiline: true },
+      ],
+    },
+    act: {
+      title: 'Act',
+      fields: [
+        { key: 'title', label: 'Act title', placeholder: 'Work completion act', required: true },
+        { key: 'actNumber', label: 'Act number', placeholder: 'WCA-007' },
+        { key: 'client', label: 'Client', placeholder: 'Client LLC', required: true },
+        { key: 'provider', label: 'Provider', placeholder: 'John Smith' },
+        { key: 'workDescription', label: 'Work description', placeholder: 'App screen development, API integration...', multiline: true },
+        { key: 'completionDate', label: 'Completion date', placeholder: '03/10/2026' },
+        { key: 'amount', label: 'Amount', placeholder: '50,000 UAH' },
+        { key: 'signatoryClient', label: 'Client signature', placeholder: 'John Doe' },
+        { key: 'signatoryProvider', label: 'Provider signature', placeholder: 'Jane Smith' },
+      ],
+    },
+  },
 };
 
 export function getDefaultTemplates(locale: AppLocale = getAppLocale()): DocumentTemplate[] {
   const now = new Date().toISOString();
-  const content = TEMPLATE_CONTENT[locale];
+  const content = TEMPLATE_CONTENT[locale] ?? TEMPLATE_CONTENT['en'];
 
   return (Object.keys(TEMPLATE_META) as Array<keyof typeof TEMPLATE_META>).map((id) => ({
     id,

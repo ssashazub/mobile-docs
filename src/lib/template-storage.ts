@@ -22,14 +22,17 @@ export async function ensureTemplatesSeeded(): Promise<void> {
 }
 
 export async function getTemplates(): Promise<DocumentTemplate[]> {
-  await ensureTemplatesSeeded();
   const raw = await AsyncStorage.getItem(TEMPLATES_STORAGE_KEY);
+  const defaultTemplates = getDefaultTemplates(getAppLocale()).map(cloneTemplate);
 
   if (!raw) {
-    return getDefaultTemplates(getAppLocale()).map(cloneTemplate);
+    return defaultTemplates;
   }
 
-  return (JSON.parse(raw) as DocumentTemplate[]).map(cloneTemplate);
+  const savedTemplates = (JSON.parse(raw) as DocumentTemplate[]).map(cloneTemplate);
+  const customTemplates = savedTemplates.filter((template) => !template.isBuiltIn);
+
+  return [...defaultTemplates, ...customTemplates];
 }
 
 export async function getTemplateById(templateId: string): Promise<DocumentTemplate | null> {

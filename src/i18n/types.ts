@@ -1,4 +1,4 @@
-export type AppLocale = 'uk' | 'ru';
+export type AppLocale = 'uk' | 'ru' | 'en';
 
 export type TranslationSchema = {
   common: {
