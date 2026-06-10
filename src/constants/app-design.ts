@@ -1,0 +1,46 @@
+import { Platform } from 'react-native';
+
+export const AppDesign = {
+  background: '#eef2ff',
+  backgroundSoft: '#f8fafc',
+  surface: '#ffffff',
+  primary: '#4f46e5',
+  primarySoft: '#eef2ff',
+  text: '#0f172a',
+  textSecondary: '#475569',
+  textMuted: '#94a3b8',
+  border: '#e2e8f0',
+  danger: '#ef4444',
+  dangerSoft: '#fef2f2',
+  success: '#059669',
+  radius: {
+    sm: 12,
+    md: 16,
+    lg: 22,
+    xl: 28,
+  },
+  shadow: Platform.select({
+    ios: {
+      shadowColor: '#312e81',
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+    },
+    android: {
+      elevation: 4,
+    },
+    default: {},
+  }),
+  cardShadow: Platform.select({
+    ios: {
+      shadowColor: '#0f172a',
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+    },
+    android: {
+      elevation: 3,
+    },
+    default: {},
+  }),
+} as const;
