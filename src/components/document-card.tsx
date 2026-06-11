@@ -3,12 +3,13 @@ import * as Haptics from 'expo-haptics';
 
 import { AppDesign } from '@/constants/app-design';
 import { useI18n } from '@/hooks/use-i18n';
+import { getDocumentDisplayInfo } from '@/lib/document-display';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate } from '@/types/template';
 
 type DocumentCardProps = {
   document: Document;
-  template: DocumentTemplate;
+  template?: DocumentTemplate | null;
   onPress: () => void;
   onLongPress: () => void;
 };
@@ -20,6 +21,7 @@ export function DocumentCard({
   onLongPress,
 }: DocumentCardProps) {
   const { t, dateLocale } = useI18n();
+  const display = getDocumentDisplayInfo(document, template);
 
   return (
     <Pressable
@@ -32,16 +34,16 @@ export function DocumentCard({
       style={({ pressed }) => [
         styles.card,
         pressed && styles.cardPressed,
-        { borderColor: pressed ? template.accentColor : AppDesign.border },
+        { borderColor: pressed ? display.accentColor : AppDesign.border },
       ]}
     >
-      <View style={[styles.accentStrip, { backgroundColor: template.accentColor }]} />
+      <View style={[styles.accentStrip, { backgroundColor: display.accentColor }]} />
 
       <View style={styles.content}>
         <View style={styles.topRow}>
-          <View style={[styles.badge, { backgroundColor: `${template.accentColor}16` }]}>
-            <Text style={[styles.badgeText, { color: template.accentColor }]}>
-              {template.emoji} {template.title}
+          <View style={[styles.badge, { backgroundColor: `${display.accentColor}16` }]}>
+            <Text style={[styles.badgeText, { color: display.accentColor }]}>
+              {display.emoji} {display.title}
             </Text>
           </View>
           <Text style={styles.date}>

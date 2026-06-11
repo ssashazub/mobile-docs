@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,14 +12,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FormField } from '@/components/ui/form-field';
+import { PdfFormFieldInput } from '@/components/pdf-form-field';
+import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
+import { getDocumentDisplayInfo, isImportedFormDocument } from '@/lib/document-display';
 import { getDocuments, updateDocument } from '@/lib/document-storage';
 import { buildDocumentFromFields } from '@/lib/document-helpers';
+import { getFieldValidationAlert } from '@/lib/field-validation-alert';
+import { validatePdfFormFields, validateTemplateFields } from '@/lib/field-validation';
 import { normalizePdfStyle } from '@/lib/template-helpers';
 import { getTemplateById } from '@/lib/template-storage';
 import { Spacing } from '@/constants/theme';
@@ -69,18 +74,20 @@ export default function EditDocumentScreen() {
 
         try {
           const documents = await getDocuments();
-
-          if (documents.length === 0) {
-            if (isActive) {
-              setNotFound(true);
-            }
-            return;
-          }
           const foundDocument = documents.find((doc) => doc.id === documentId);
 
           if (!foundDocument) {
             if (isActive) {
               setNotFound(true);
+            }
+            return;
+          }
+
+          if (isImportedFormDocument(foundDocument)) {
+            if (isActive) {
+              setDocument(foundDocument);
+              setTemplate(null);
+              setFields(foundDocument.fields);
             }
             return;
           }
@@ -125,13 +132,54 @@ export default function EditDocumentScreen() {
   };
 
   const saveDocument = async () => {
-    if (documentId === null || !document || !template || !fields.title?.trim()) {
+    if (documentId === null || !document) {
       return;
+    }
+
+    if (isImportedFormDocument(document) && document.formFields) {
+      const validationError = validatePdfFormFields(document.formFields, fields);
+
+      if (validationError) {
+        const alert = getFieldValidationAlert(validationError, t);
+        Alert.alert(alert.title, alert.message);
+        return;
+      }
+    } else if (template) {
+      const validationError = validateTemplateFields(template.fields, fields);
+
+      if (validationError) {
+        const alert = getFieldValidationAlert(validationError, t);
+        Alert.alert(alert.title, alert.message);
+        return;
+      }
     }
 
     setSaving(true);
 
     try {
+      if (isImportedFormDocument(document)) {
+        const nextFields = Object.fromEntries(
+          Object.entries(fields).map(([key, value]) => [key, value.trim()])
+        );
+        const firstValue = Object.values(nextFields).find((value) => value.length > 0);
+
+        await updateDocument({
+          ...document,
+          fields: nextFields,
+          formFields: document.formFields?.map((field) => ({
+            ...field,
+            value: nextFields[field.name] ?? '',
+          })),
+          title: firstValue || document.title,
+        });
+        router.replace(`/document/${documentId}`);
+        return;
+      }
+
+      if (!template || !fields.title?.trim()) {
+        return;
+      }
+
       const updatedDocument = buildDocumentFromFields(template, fields, documentId, pdfStyle);
       await updateDocument({ ...updatedDocument, createdAt: document.createdAt });
       router.back();
@@ -148,7 +196,7 @@ export default function EditDocumentScreen() {
     );
   }
 
-  if (notFound || !document || !template) {
+  if (notFound || !document) {
     return (
       <ThemedView style={styles.centered}>
         <ThemedText type="subtitle">{t('document.notFound')}</ThemedText>
@@ -157,9 +205,17 @@ export default function EditDocumentScreen() {
     );
   }
 
+  const display = getDocumentDisplayInfo(document, template);
+  const isFormImport = isImportedFormDocument(document);
+  const canSave = isFormImport
+    ? Object.values(fields).some((value) => value.trim().length > 0)
+    : Boolean(fields.title?.trim());
+
   return (
     <>
-      <Stack.Screen options={{ title: `${t('document.editTitle')} · ${template.title}` }} />
+      <Stack.Screen
+        options={{ title: `${t('document.editTitle')} · ${display.title}` }}
+      />
 
       <ThemedView style={styles.screen}>
         <KeyboardAvoidingView
@@ -176,41 +232,54 @@ export default function EditDocumentScreen() {
             showsVerticalScrollIndicator={false}
           >
             <LinearGradient
-              colors={[template.accentColor, template.gradientEnd]}
+              colors={[display.accentColor, display.gradientEnd]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.typeBanner}
             >
               <ThemedText style={styles.typeBannerText}>
-                {template.emoji} {template.title}
+                {display.emoji} {display.title}
               </ThemedText>
             </LinearGradient>
 
             <ThemedText themeColor="textSecondary" style={styles.hint}>
-              {t('document.editHint')}
+              {isFormImport ? t('import.formHint') : t('document.editHint')}
             </ThemedText>
 
-            <PdfLayoutPicker
-              value={pdfStyle}
-              accentColor={template.accentColor}
-              gradientEnd={template.gradientEnd}
-              onChange={setPdfStyle}
-            />
+            {!isFormImport && template ? (
+              <PdfLayoutPicker
+                value={pdfStyle}
+                accentColor={template.accentColor}
+                gradientEnd={template.gradientEnd}
+                onChange={setPdfStyle}
+              />
+            ) : null}
 
             <View style={styles.form}>
-              {template.fields.map((field) => (
-                <FormField
-                  key={field.key}
-                  label={field.label}
-                  value={fields[field.key] ?? ''}
-                  onChangeText={(value) => updateField(field.key, value)}
-                  placeholder={field.placeholder}
-                  multiline={field.multiline}
-                  numberOfLines={field.multiline ? 4 : 1}
-                  textAlignVertical={field.multiline ? 'top' : 'center'}
-                  style={field.multiline ? styles.descriptionInput : undefined}
-                />
-              ))}
+              {isFormImport && document.formFields
+                ? document.formFields.map((field) => (
+                    <PdfFormFieldInput
+                      key={field.name}
+                      field={field}
+                      value={fields[field.name] ?? ''}
+                      onChange={(value) => updateField(field.name, value)}
+                    />
+                  ))
+                : display.fields.map((field) => (
+                    <ValidatedFormField
+                      key={field.key}
+                      fieldKey={field.key}
+                      kind={field.kind}
+                      label={field.label}
+                      value={fields[field.key] ?? ''}
+                      onChangeText={(value) => updateField(field.key, value)}
+                      placeholder={field.placeholder}
+                      multiline={field.multiline}
+                      numberOfLines={field.multiline ? 4 : 1}
+                      textAlignVertical={field.multiline ? 'top' : 'center'}
+                      style={field.multiline ? styles.descriptionInput : undefined}
+                    />
+                  ))}
             </View>
 
             <View style={styles.actions}>
@@ -218,7 +287,7 @@ export default function EditDocumentScreen() {
                 label={t('common.save')}
                 onPress={saveDocument}
                 loading={saving}
-                disabled={!fields.title?.trim()}
+                disabled={!canSave}
               />
               <PrimaryButton
                 label={t('common.cancel')}

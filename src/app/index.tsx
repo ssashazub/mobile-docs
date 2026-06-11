@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, Pressable, View, ScrollView } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, Pressable, View, ScrollView } from 'react-native';
 import { type Href, router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,7 +8,9 @@ import { ActionSheet } from '@/components/ui/action-sheet';
 import { DocumentCard } from '@/components/document-card';
 import { AppDesign } from '@/constants/app-design';
 import { useI18n } from '@/hooks/use-i18n';
+import { resolveTemplateForDocument } from '@/lib/document-display';
 import { deleteDocument as deleteStoredDocument, getDocuments } from '@/lib/document-storage';
+import { ImportCancelledError, pickAndImportPdf } from '@/lib/import-pdf';
 import { getTemplates } from '@/lib/template-storage';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate } from '@/types/template';
@@ -18,6 +20,7 @@ export default function HomeScreen() {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
     const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+    const [importing, setImporting] = useState(false);
 
     const templatesMap = useMemo(
         () => Object.fromEntries(templates.map((template) => [template.id, template])),
@@ -46,8 +49,27 @@ export default function HomeScreen() {
     };
 
     const selectedTemplate = selectedDocument
-        ? templatesMap[selectedDocument.templateId]
+        ? resolveTemplateForDocument(selectedDocument, templatesMap)
         : null;
+
+    const handleImportPdf = async () => {
+        try {
+            setImporting(true);
+            const document = await pickAndImportPdf();
+            await loadData();
+            router.push(`/document/edit/${document.id}`);
+        } catch (error) {
+            if (error instanceof ImportCancelledError) {
+                return;
+            }
+            Alert.alert(
+                t('import.errorTitle'),
+                error instanceof Error ? error.message : t('import.errorTitle')
+            );
+        } finally {
+            setImporting(false);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -80,6 +102,21 @@ export default function HomeScreen() {
                 </Pressable>
 
                 <Pressable
+                    style={({ pressed }) => [styles.importButton, pressed && styles.createButtonPressed]}
+                    onPress={handleImportPdf}
+                    disabled={importing}
+                >
+                    {importing ? (
+                        <ActivityIndicator color={AppDesign.primary} />
+                    ) : (
+                        <>
+                            <Text style={styles.importTitle}>📥 {t('home.importPdf')}</Text>
+                            <Text style={styles.importSubtitle}>{t('home.importPdfSubtitle')}</Text>
+                        </>
+                    )}
+                </Pressable>
+
+                <Pressable
                     style={({ pressed }) => [styles.templatesButton, pressed && styles.createButtonPressed]}
                     onPress={() => router.push('/templates' as Href)}
                 >
@@ -96,11 +133,7 @@ export default function HomeScreen() {
                 ) : (
                     <View style={styles.list}>
                         {documents.map((doc) => {
-                            const template = templatesMap[doc.templateId];
-
-                            if (!template) {
-                                return null;
-                            }
+                            const template = resolveTemplateForDocument(doc, templatesMap);
 
                             return (
                                 <DocumentCard
@@ -222,6 +255,25 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 24,
         fontWeight: '800',
+    },
+    importButton: {
+        backgroundColor: AppDesign.surface,
+        borderRadius: AppDesign.radius.lg,
+        borderWidth: 1,
+        borderColor: '#99f6e4',
+        padding: 16,
+        gap: 4,
+        minHeight: 72,
+        justifyContent: 'center',
+    },
+    importTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#0f766e',
+    },
+    importSubtitle: {
+        fontSize: 13,
+        color: AppDesign.textSecondary,
     },
     templatesButton: {
         backgroundColor: AppDesign.surface,

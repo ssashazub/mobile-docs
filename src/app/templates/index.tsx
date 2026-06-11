@@ -57,6 +57,14 @@ export default function TemplatesScreen() {
             <Text style={styles.createSubtitle}>{t('templates.createSubtitle')}</Text>
           </Pressable>
 
+          <Pressable
+            style={({ pressed }) => [styles.createButton, styles.secondaryButton, pressed && styles.pressed]}
+            onPress={() => router.push('/pdf-styles' as Href)}
+          >
+            <Text style={styles.secondaryTitle}>{t('pdfStyle.manageTitle')}</Text>
+            <Text style={styles.secondarySubtitle}>{t('pdfStyle.manageSubtitle')}</Text>
+          </Pressable>
+
           <View style={styles.list}>
             {templates.map((template) => (
               <View key={template.id} style={styles.itemWrap}>
@@ -115,6 +123,23 @@ const styles = StyleSheet.create({
   },
   createSubtitle: {
     color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+  },
+  secondaryButton: {
+    backgroundColor: AppDesign.surface,
+    borderWidth: 1.5,
+    borderColor: AppDesign.border,
+    ...AppDesign.cardShadow,
+    shadowOpacity: 0.06,
+    elevation: 1,
+  },
+  secondaryTitle: {
+    color: AppDesign.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  secondarySubtitle: {
+    color: AppDesign.textSecondary,
     fontSize: 13,
   },
   list: {

@@ -2,7 +2,11 @@ import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-nati
 
 import { AppDesign } from '@/constants/app-design';
 import { useI18n } from '@/hooks/use-i18n';
+import type { t } from '@/i18n';
+import type { FieldInputKind } from '@/types/field-validation';
 import type { TemplateField } from '@/types/template';
+
+type TranslationKey = Parameters<typeof t>[0];
 
 type TemplateFieldEditorProps = {
   field: TemplateField;
@@ -12,6 +16,23 @@ type TemplateFieldEditorProps = {
   canDelete: boolean;
 };
 
+const FIELD_KINDS: FieldInputKind[] = ['text', 'date', 'number', 'email', 'phone'];
+
+function getFieldKindLabel(kind: FieldInputKind): TranslationKey {
+  switch (kind) {
+    case 'date':
+      return 'templates.fieldKindDate';
+    case 'number':
+      return 'templates.fieldKindNumber';
+    case 'email':
+      return 'templates.fieldKindEmail';
+    case 'phone':
+      return 'templates.fieldKindPhone';
+    default:
+      return 'templates.fieldKindText';
+  }
+}
+
 export function TemplateFieldEditor({
   field,
   index,
@@ -20,6 +41,15 @@ export function TemplateFieldEditor({
   canDelete,
 }: TemplateFieldEditorProps) {
   const { t } = useI18n();
+  const selectedKind = field.kind ?? 'text';
+
+  const setKind = (kind: FieldInputKind) => {
+    onChange({
+      ...field,
+      kind,
+      multiline: kind === 'text' ? field.multiline : false,
+    });
+  };
 
   return (
     <View style={styles.card}>
@@ -56,11 +86,35 @@ export function TemplateFieldEditor({
         keyboardType="default"
       />
 
+      <Text style={styles.label}>{t('templates.fieldKind')}</Text>
+      <View style={styles.kindRow}>
+        {FIELD_KINDS.map((kind) => {
+          const selected = selectedKind === kind;
+
+          return (
+            <Pressable
+              key={kind}
+              onPress={() => setKind(kind)}
+              style={({ pressed }) => [
+                styles.kindChip,
+                selected && styles.kindChipSelected,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.kindChipText, selected && styles.kindChipTextSelected]}>
+                {t(getFieldKindLabel(kind))}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>{t('templates.multiline')}</Text>
         <Switch
           value={!!field.multiline}
           onValueChange={(multiline) => onChange({ ...field, multiline })}
+          disabled={selectedKind !== 'text'}
           trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
           thumbColor={field.multiline ? AppDesign.primary : '#f8fafc'}
         />
@@ -141,5 +195,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: AppDesign.text,
+  },
+  kindRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  kindChip: {
+    borderWidth: 1.5,
+    borderColor: AppDesign.border,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: AppDesign.backgroundSoft,
+  },
+  kindChipSelected: {
+    borderColor: AppDesign.primary,
+    backgroundColor: '#eef2ff',
+  },
+  kindChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: AppDesign.textSecondary,
+  },
+  kindChipTextSelected: {
+    color: AppDesign.primary,
   },
 });

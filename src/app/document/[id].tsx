@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
+import { getDocumentDisplayInfo, isImportedFormDocument } from '@/lib/document-display';
+import { formatFormFieldDisplayValue } from '@/lib/pdf-form';
 import { getDocuments } from '@/lib/document-storage';
 import { exportDocumentPdf } from '@/lib/export-pdf';
 import { getTemplateById } from '@/lib/template-storage';
@@ -79,10 +81,15 @@ export default function DocumentDetailsScreen() {
         return;
       }
 
-      const loadedTemplate = await getTemplateById(foundDocument.templateId);
+      if (isImportedFormDocument(foundDocument)) {
+        setDocument(foundDocument);
+        setTemplate(null);
+        return;
+      }
 
+      const loadedTemplate = await getTemplateById(foundDocument.templateId);
       setDocument(foundDocument);
-      setTemplate(loadedTemplate);
+      setTemplate(loadedTemplate ?? null);
     } finally {
       setLoading(false);
     }
@@ -121,7 +128,7 @@ export default function DocumentDetailsScreen() {
     );
   }
 
-  if (notFound || !document || !template) {
+  if (notFound || !document) {
     return (
       <ThemedView style={styles.centered}>
         <Stack.Screen options={{ title: t('document.title') }} />
@@ -129,6 +136,8 @@ export default function DocumentDetailsScreen() {
       </ThemedView>
     );
   }
+
+  const display = getDocumentDisplayInfo(document, template);
 
   return (
     <>
@@ -155,27 +164,35 @@ export default function DocumentDetailsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <LinearGradient
-            colors={[template.accentColor, template.gradientEnd]}
+            colors={[display.accentColor, display.gradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.typeHero}
           >
-            <ThemedText style={styles.typeHeroEmoji}>{template.emoji}</ThemedText>
+            <ThemedText style={styles.typeHeroEmoji}>{display.emoji}</ThemedText>
             <ThemedText style={styles.typeHeroTitle}>{document.title}</ThemedText>
-            <ThemedText style={styles.typeHeroSubtitle}>{template.title}</ThemedText>
+            <ThemedText style={styles.typeHeroSubtitle}>{display.title}</ThemedText>
             <ThemedText style={styles.typeHeroDate}>
               {t('document.created')} {new Date(document.createdAt).toLocaleDateString(dateLocale)}
             </ThemedText>
           </LinearGradient>
 
           <View style={styles.details}>
-            {template.fields.map((field) => (
-              <DetailRow
-                key={field.key}
-                label={field.label}
-                value={document.fields[field.key] ?? ''}
-              />
-            ))}
+            {isImportedFormDocument(document) && document.formFields
+              ? document.formFields.map((field) => (
+                  <DetailRow
+                    key={field.name}
+                    label={field.label}
+                    value={formatFormFieldDisplayValue(field, document.fields[field.name] ?? '')}
+                  />
+                ))
+              : display.fields.map((field) => (
+                  <DetailRow
+                    key={field.key}
+                    label={field.label}
+                    value={document.fields[field.key] ?? ''}
+                  />
+                ))}
           </View>
 
           <Pressable
@@ -183,7 +200,7 @@ export default function DocumentDetailsScreen() {
             disabled={exporting}
             style={({ pressed }) => [
               styles.pdfButton,
-              { backgroundColor: template.accentColor },
+              { backgroundColor: display.accentColor },
               (pressed || exporting) && styles.pdfButtonPressed,
             ]}
           >

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { DOCUMENTS_STORAGE_KEY } from '@/constants/storage';
 import { normalizeDocument } from '@/lib/document-helpers';
+import { deletePdfForDocument } from '@/lib/pdf-file-storage';
 import type { Document } from '@/types/document';
 
 export async function getDocuments(): Promise<Document[]> {
@@ -30,5 +31,9 @@ export async function updateDocument(document: Document): Promise<void> {
 
 export async function deleteDocument(documentId: number): Promise<void> {
   const documents = await getDocuments();
+  const target = documents.find((item) => item.id === documentId);
   await saveDocuments(documents.filter((item) => item.id !== documentId));
+  if (target?.source === 'imported-form') {
+    await deletePdfForDocument(documentId);
+  }
 }

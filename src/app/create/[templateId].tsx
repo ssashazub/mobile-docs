@@ -12,13 +12,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FormField } from '@/components/ui/form-field';
+import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AppDesign } from '@/constants/app-design';
 import { useI18n } from '@/hooks/use-i18n';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpers';
+import { getFieldValidationAlert } from '@/lib/field-validation-alert';
+import { validateTemplateFields } from '@/lib/field-validation';
 import { normalizePdfStyle } from '@/lib/template-helpers';
 import { getTemplateById } from '@/lib/template-storage';
 import type { DocumentTemplate, PdfStyle } from '@/types/template';
@@ -70,15 +72,11 @@ export default function CreateDocumentFormScreen() {
       return;
     }
 
-    const requiredField = template.fields.find(
-      (field) => field.required && !fields[field.key]?.trim()
-    );
+    const validationError = validateTemplateFields(template.fields, fields);
 
-    if (requiredField) {
-      Alert.alert(
-        t('create.fillRequired'),
-        t('create.fillRequiredField', { label: requiredField.label })
-      );
+    if (validationError) {
+      const alert = getFieldValidationAlert(validationError, t);
+      Alert.alert(alert.title, alert.message);
       return;
     }
 
@@ -161,8 +159,10 @@ export default function CreateDocumentFormScreen() {
 
           <View style={styles.form}>
             {fieldList.map((field) => (
-              <FormField
+              <ValidatedFormField
                 key={field.key}
+                fieldKey={field.key}
+                kind={field.kind}
                 label={field.label}
                 value={fields[field.key] ?? ''}
                 onChangeText={(value) => updateField(field.key, value)}

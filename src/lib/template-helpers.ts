@@ -14,6 +14,9 @@ export function normalizePdfStyle(
     layout: pdfStyle?.layout ?? builtin?.layout ?? DEFAULT_PDF_STYLE.layout,
     showFooter: pdfStyle?.showFooter ?? builtin?.showFooter ?? DEFAULT_PDF_STYLE.showFooter,
     showDate: pdfStyle?.showDate ?? builtin?.showDate ?? DEFAULT_PDF_STYLE.showDate,
+    design: pdfStyle?.design,
+    savedStyleId: pdfStyle?.savedStyleId,
+    savedStyleName: pdfStyle?.savedStyleName,
   };
 }
 

@@ -1,17 +1,33 @@
+import type { FieldInputKind } from '@/types/field-validation';
+
 export type TemplateField = {
   key: string;
   label: string;
   placeholder?: string;
   multiline?: boolean;
   required?: boolean;
+  kind?: FieldInputKind;
 };
 
-export type PdfLayout = 'classic' | 'minimal' | 'formal' | 'compact';
+import type { PdfStyleDesign } from '@/types/pdf-style-design';
+
+export type PdfLayout =
+  | 'classic'
+  | 'minimal'
+  | 'formal'
+  | 'compact'
+  | 'modern'
+  | 'elegant'
+  | 'bold'
+  | 'sidebar';
 
 export type PdfStyle = {
-  layout: PdfLayout;
+  layout: PdfLayout | 'custom';
   showFooter: boolean;
   showDate: boolean;
+  design?: Partial<PdfStyleDesign>;
+  savedStyleId?: string;
+  savedStyleName?: string;
 };
 
 export type DocumentTemplate = {

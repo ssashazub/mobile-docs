@@ -1,7 +1,9 @@
+import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
 import { t } from '@/i18n';
 import { getTemplateById } from '@/lib/template-storage';
+import { isCheckboxChecked } from '@/lib/pdf-form';
 import { normalizePdfStyle } from '@/lib/template-helpers';
-import type { Document } from '@/types/document';
+import type { Document, DocumentSource, PdfFormField } from '@/types/document';
 import type { DocumentTemplate, PdfStyle } from '@/types/template';
 
 type LegacyDocument = {
@@ -13,6 +15,10 @@ type LegacyDocument = {
   type?: string;
   fields?: Record<string, string>;
   pdfStyle?: Partial<PdfStyle>;
+  source?: DocumentSource;
+  originalPdfUri?: string;
+  formFields?: PdfFormField[];
+  importedFileName?: string;
   createdAt: string;
 };
 
@@ -30,6 +36,18 @@ export function normalizeDocument(raw: LegacyDocument): Document {
       client: raw.client ?? '',
     },
     pdfStyle: raw.pdfStyle ? normalizePdfStyle(raw.pdfStyle, templateId) : undefined,
+    source: raw.source ?? 'template',
+    originalPdfUri: raw.originalPdfUri,
+    formFields: raw.formFields?.map((field) => ({
+      ...field,
+      value:
+        field.type === 'checkbox'
+          ? isCheckboxChecked(field.value)
+            ? 'true'
+            : 'false'
+          : field.value,
+    })),
+    importedFileName: raw.importedFileName,
     createdAt: raw.createdAt,
   };
 }
@@ -63,6 +81,32 @@ export function buildDocumentFromFields(
     description,
     fields,
     pdfStyle,
+    source: 'template',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function buildImportedFormDocument(
+  id: number,
+  fileName: string,
+  formFields: PdfFormField[],
+  fields: Record<string, string>,
+  originalPdfUri: string
+): Document {
+  const firstValue = formFields.map((field) => fields[field.name]?.trim()).find(Boolean);
+  const title = firstValue || fileName.replace(/\.pdf$/i, '') || fileName;
+
+  return {
+    id,
+    title,
+    templateId: IMPORTED_FORM_TEMPLATE_ID,
+    client: fields.client?.trim() ?? '',
+    description: fileName,
+    fields,
+    formFields,
+    source: 'imported-form',
+    originalPdfUri,
+    importedFileName: fileName,
     createdAt: new Date().toISOString(),
   };
 }

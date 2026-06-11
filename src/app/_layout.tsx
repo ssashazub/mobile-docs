@@ -24,6 +24,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ title: t('home.title') }} />
         <Stack.Screen name="create/index" options={{ title: t('create.screenTitle') }} />
         <Stack.Screen name="templates/index" options={{ title: t('templates.title') }} />
+        <Stack.Screen name="pdf-styles/index" options={{ title: t('pdfStyle.manageTitle') }} />
         <Stack.Screen name="explore" options={{ title: 'Explore' }} />
       </Stack>
     </>
