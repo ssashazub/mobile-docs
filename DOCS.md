@@ -9,8 +9,9 @@
 
 1. **Документы** — создаёшь по шаблону, заполняешь поля, смотришь, редактируешь, экспортируешь PDF.
 2. **Шаблоны** — встроенные (Договор, Рахунок, Звіт, Акт) + свои кастомные. Настраиваются поля, цвет, вид PDF.
-3. **Локализация** — украинский и русский (по языку системы).
-4. **Хранение** — всё локально в AsyncStorage на устройстве.
+3. **Локализация** — украинский, русский, английский (по языку системы).
+4. **Импорт PDF** — свои документы и сторонние PDF-формы.
+5. **Хранение** — всё локально в AsyncStorage на устройстве.
 
 ---
 
@@ -26,6 +27,7 @@
 | `/templates` | `src/app/templates/index.tsx` | Список всех шаблонов |
 | `/templates/create` | `src/app/templates/create.tsx` | Создание своего шаблона |
 | `/templates/edit/[id]` | `src/app/templates/edit/[id].tsx` | Редактирование шаблона |
+| `/pdf-styles` | `src/app/pdf-styles/index.tsx` | Сохранённые PDF-стили |
 
 Общая навигация и заголовки шапки: `src/app/_layout.tsx`
 
@@ -36,13 +38,211 @@
 ```
 src/
 ├── app/                  # Экраны (Expo Router — файл = маршрут)
+├── core/                 # ★ Ядро: шаблоны и PDF (без UI)
 ├── components/           # UI-компоненты
 ├── constants/            # Константы, дефолты, дизайн
 ├── hooks/                # React-хуки приложения
-├── i18n/                 # Переводы uk / ru
-├── lib/                  # Логика: хранение, PDF, хелперы
+├── i18n/                 # Переводы uk / ru / en
+├── lib/                  # Логика: хранение, импорт, хелперы
 └── types/                # TypeScript-типы
 ```
+
+---
+
+## Ядро (`src/core/`) — главное для разработки шаблонов
+
+Ядро отделено от экранов и AsyncStorage. Здесь описываются **встроенные шаблоны** и **сборка PDF**.  
+Экраны и `lib/*` только вызывают API ядра.
+
+```
+src/core/
+├── index.ts                    # Публичный API (re-export)
+├── templates/
+│   ├── types.ts                # BuiltinTemplateDefinition, TemplateFieldDefinition
+│   ├── field-def.ts            # defineField(), resolveTemplateFields(), CommonFieldKeys
+│   ├── registry.ts             # buildBuiltinTemplate(), getBuiltinTemplates()
+│   ├── definitions/
+│   │   ├── index.ts            # BUILTIN_TEMPLATE_DEFINITIONS — реестр
+│   │   ├── contract.ts         # Один файл = один встроенный шаблон
+│   │   ├── invoice.ts
+│   │   ├── report.ts
+│   │   └── act.ts
+│   └── index.ts
+└── pdf/
+    ├── html.ts                 # escapeHtml, formatFieldValue, wrapPdfPage
+    ├── styles.ts               # buildPdfStyles(design)
+    ├── render.ts               # renderDocumentPdfHtml() — оркестратор
+    ├── parts/
+    │   ├── header.ts           # renderPdfHeader()
+    │   ├── fields.ts           # renderPdfFields() — sections/list/table/cards/columns
+    │   └── footer.ts           # renderPdfFooter()
+    └── index.ts
+```
+
+### Импорт из ядра
+
+```typescript
+import {
+  defineField,
+  getBuiltinTemplates,
+  BUILTIN_TEMPLATE_DEFINITIONS,
+  renderDocumentPdfHtml,
+  renderPdfHeader,
+  buildPdfStyles,
+} from '@/core';
+```
+
+Старые пути (`constants/default-templates.ts`, `lib/pdf-templates.ts`) оставлены как тонкие обёртки для совместимости.
+
+---
+
+## Как добавить новый встроенный шаблон (пошагово)
+
+### 1. Создайте файл определения
+
+`src/core/templates/definitions/offer.ts`:
+
+```typescript
+import { defineField } from '@/core/templates/field-def';
+import type { BuiltinTemplateDefinition } from '@/core/templates/types';
+
+export const offerDefinition: BuiltinTemplateDefinition = {
+  id: 'offer',                    // уникальный id (латиница)
+  emoji: '📋',
+  accentColor: '#4f46e5',
+  gradientEnd: '#6366f1',
+  locales: {
+    uk: { title: 'Комерційна пропозиція' },
+    ru: { title: 'Коммерческое предложение' },
+    en: { title: 'Commercial offer' },
+  },
+  fields: [
+    defineField('title', {
+      uk: { label: 'Назва', placeholder: 'Пропозиція для клієнта' },
+      ru: { label: 'Название', placeholder: 'Предложение для клиента' },
+      en: { label: 'Title', placeholder: 'Offer for client' },
+    }, { required: true }),
+    defineField('client', {
+      uk: { label: 'Клієнт', placeholder: 'ТОВ «Компанія»' },
+      ru: { label: 'Клиент', placeholder: 'ООО «Компания»' },
+      en: { label: 'Client', placeholder: 'Company LLC' },
+    }, { required: true }),
+    defineField('amount', {
+      uk: { label: 'Сума', placeholder: '10 000' },
+      ru: { label: 'Сумма', placeholder: '10 000' },
+      en: { label: 'Amount', placeholder: '10,000' },
+    }, { kind: 'number' }),
+    defineField('validUntil', {
+      uk: { label: 'Дійсна до', placeholder: '07.06.2026' },
+      ru: { label: 'Действует до', placeholder: '07.06.2026' },
+      en: { label: 'Valid until', placeholder: '07.06.2026' },
+    }, { kind: 'date' }),
+  ],
+};
+```
+
+### 2. Зарегистрируйте в реестре
+
+`src/core/templates/definitions/index.ts`:
+
+```typescript
+import { offerDefinition } from '@/core/templates/definitions/offer';
+
+export const BUILTIN_TEMPLATE_DEFINITIONS = [
+  contractDefinition,
+  invoiceDefinition,
+  reportDefinition,
+  actDefinition,
+  offerDefinition,   // ← добавить
+];
+```
+
+### 3. (Опционально) Дефолтный PDF-стиль
+
+`src/constants/pdf-layouts.ts` → `BUILTIN_PDF_STYLES`:
+
+```typescript
+offer: { layout: 'modern' },
+```
+
+### 4. (Опционально) Название в переводах
+
+`src/i18n/locales/uk.ts` → `templateNames.offer = 'Комерційна пропозиція'` (и ru/en).
+
+### 5. Проверка
+
+```bash
+npx tsc --noEmit
+```
+
+После перезапуска приложения шаблон появится в списке (встроенные всегда подмешиваются из ядра).
+
+---
+
+## API полей шаблона (`defineField`)
+
+| Параметр | Описание |
+|----------|----------|
+| `key` | Стабильный ключ поля (`title`, `client`, `amount`…) |
+| `locales` | Подписи и placeholder для `uk`, `ru`, `en` |
+| `required` | Обязательное при создании документа |
+| `multiline` | Многострочный ввод |
+| `kind` | `text` \| `date` \| `number` \| `email` \| `phone` — валидация |
+
+Константа `CommonFieldKeys` в `field-def.ts` — список типичных ключей для единообразия.
+
+---
+
+## PDF-ядро: как устроена сборка
+
+```
+Document + DocumentTemplate
+       ↓
+normalizePdfStyle() + resolvePdfDesign()   (lib/pdf-style-resolver.ts)
+       ↓
+renderDocumentPdfHtml()                  (core/pdf/render.ts)
+  ├── buildPdfStyles(design)             (core/pdf/styles.ts)
+  ├── renderPdfHeader(...)               (core/pdf/parts/header.ts)
+  ├── renderPdfFields(...)               (core/pdf/parts/fields.ts)
+  └── renderPdfFooter(...)               (core/pdf/parts/footer.ts)
+       ↓
+wrapPdfPage() → HTML
+       ↓
+export-pdf.ts → expo-print → PDF
+```
+
+### Варианты заголовка (`headerStyle`)
+`gradient` · `solid` · `banner` · `sidebar` · `line` · `minimal`
+
+### Варианты полей (`fieldsStyle`)
+`sections` · `list` · `table` · `cards` · `columns`
+
+Пресеты макетов (`classic`, `modern`, …) задают комбинацию header + fields в `constants/pdf-layouts.ts` → `LAYOUT_DESIGN_PRESETS`.
+
+### Как добавить новый стиль полей в PDF
+
+1. Добавьте вариант в тип `PdfFieldsStyle` (`types/pdf-style-design.ts`)
+2. Реализуйте рендер в `core/pdf/parts/fields.ts`
+3. Добавьте CSS в `core/pdf/styles.ts`
+4. Добавьте опцию в конструктор (`components/pdf-style-constructor.tsx`) и i18n
+
+### Как добавить новый стиль заголовка
+
+Аналогично: `PdfHeaderStyle` → `core/pdf/parts/header.ts` → `styles.ts` → UI.
+
+---
+
+## Шаблон нового встроенного шаблона (копипаст)
+
+Скопируйте `definitions/contract.ts`, переименуйте `id`, цвета, поля.  
+Минимальный чеклист:
+
+- [ ] Файл в `core/templates/definitions/`
+- [ ] Запись в `definitions/index.ts`
+- [ ] Уникальный `id`
+- [ ] Локали `uk`, `ru`, `en` для title и каждого поля
+- [ ] `kind: 'date'` / `'number'` где нужна валидация
+- [ ] `npx tsc --noEmit`
 
 ---
 
@@ -111,8 +311,11 @@ src/
 |------|-----------------|---------------|
 | `document-card.tsx` | Карточка документа на главной | Внешний вид списка на главной |
 | `document-type-card.tsx` | Карточка шаблона (выбор типа) | Внешний вид при выборе шаблона |
-| `pdf-layout-picker.tsx` | Выбор макета PDF (4 варианта + переключатели) | Новый макет, превью, подписи |
-| `template-field-editor.tsx` | Редактор одного поля шаблона (название, placeholder, multiline, required) | Поля в редакторе шаблонов |
+| `pdf-layout-picker.tsx` | Выбор макета PDF (8 пресетов + конструктор + свои стили) | Новый макет, превью, сохранённые стили |
+| `pdf-style-constructor.tsx` | Конструктор PDF: заголовок, поля, шрифт, цвета | Новые опции кастомного стиля |
+| `validated-form-field.tsx` | Поле ввода с валидацией по типу (дата, число…) | Типы полей, фильтрация ввода |
+| `pdf-form-field.tsx` | Поле импортированной PDF-формы (checkbox, radio…) | Импорт PDF |
+| `template-field-editor.tsx` | Редактор одного поля шаблона | Поля в редакторе шаблонов |
 
 ### UI — `src/components/ui/`
 
@@ -129,11 +332,15 @@ src/
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
 | `document-storage.ts` | CRUD документов в AsyncStorage (`getDocuments`, `addDocument`, `updateDocument`, `deleteDocument`) | Как сохраняются документы |
-| `template-storage.ts` | CRUD шаблонов (`getTemplates`, `saveTemplate`, `deleteTemplate`, `resetTemplateToDefault`) | Как сохраняются шаблоны |
-| `document-helpers.ts` | Сборка документа из полей, нормализация старых данных, `getNextDocumentId` | Логика title/client/description, миграция старых документов |
-| `template-helpers.ts` | Пустой шаблон, пустое поле, нормализация PDF-стиля, ключи полей | Дефолты при создании шаблона, генерация key поля |
-| `pdf-templates.ts` | HTML для PDF (4 макета: classic, minimal, formal, compact) | **Как выглядит PDF** — верстка, стили, секции |
-| `export-pdf.ts` | Генерация PDF файла + Share | Имя файла, ошибки экспорта, способ шаринга |
+| `template-storage.ts` | CRUD шаблонов | Как сохраняются шаблоны |
+| `pdf-style-storage.ts` | CRUD сохранённых PDF-стилей | Свои стили из конструктора |
+| `pdf-style-resolver.ts` | Слияние пресета макета и кастомного design | Логика конструктора PDF |
+| `field-validation.ts` | Валидация полей (дата, число, email…) | Правила ввода |
+| `document-helpers.ts` | Сборка документа из полей | Логика title/client/description |
+| `template-helpers.ts` | Пустой шаблон, нормализация PDF-стиля | Дефолты при создании шаблона |
+| `pdf-templates.ts` | Re-export → `core/pdf/render.ts` | Совместимость; правки — в `core/pdf/` |
+| `export-pdf.ts` | Генерация PDF + Share | Имя файла, ошибки экспорта |
+| `import-pdf.ts` | Импорт PDF (свой / сторонний) | Импорт форм |
 
 ---
 
@@ -153,8 +360,8 @@ src/
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
 | `storage.ts` | Ключи AsyncStorage: `documents`, `document_templates` | Только при смене ключей хранения |
-| `default-templates.ts` | **Встроенные шаблоны** (Договор, Рахунок, Звіт, Акт) — поля, названия uk/ru | Добавить/изменить поля встроенных шаблонов |
-| `pdf-layouts.ts` | Список макетов PDF, дефолтный стиль, дефолты для встроенных шаблонов | Новый макет или дефолтный вид PDF |
+| `default-templates.ts` | Re-export → `core/templates` | Совместимость |
+| `pdf-layouts.ts` | 8 макетов, пресеты design, дефолты PDF | Новый макет или пресет |
 | `template-colors.ts` | Палитра цветов для кастомных шаблонов (6 пресетов) | Добавить/изменить цвета |
 | `app-design.ts` | Цвета, радиусы, тени UI приложения | **Глобальный дизайн** приложения |
 
@@ -184,11 +391,12 @@ src/
 
 ```
 AsyncStorage
-├── documents          → Document[]     (lib/document-storage.ts)
-└── document_templates → DocumentTemplate[] (lib/template-storage.ts)
+├── documents          → Document[]
+├── document_templates → кастомные шаблоны (встроенные — из core)
+└── pdf_styles         → сохранённые PDF-стили конструктора
 ```
 
-- При первом запуске шаблоны **сидятся** из `default-templates.ts` (4 встроенных).
+- Встроенные шаблоны **не хранятся** — собираются из `core/templates/definitions/` при каждом `getTemplates()`.
 - Документы хранят `templateId` + `fields` + опционально свой `pdfStyle`.
 - Шаблоны хранят `fields`, `pdfStyle`, цвета, emoji.
 
@@ -198,18 +406,12 @@ AsyncStorage
 
 ## PDF — как устроено
 
-```
-Документ + Шаблон
-       ↓
-pdf-templates.ts  → HTML (макет по pdfStyle.layout)
-       ↓
-export-pdf.ts     → expo-print → PDF файл → expo-sharing
-```
+См. раздел **«PDF-ядро»** выше. Кратко:
 
-- Макет берётся из `document.pdfStyle`, если есть, иначе из `template.pdfStyle`.
-- 4 макета: `classic`, `minimal`, `formal`, `compact`.
-- UI выбора: `components/pdf-layout-picker.tsx`.
-- Дефолты макетов: `constants/pdf-layouts.ts`.
+- 8 пресетов макетов + кастомный конструктор + сохранённые стили
+- UI: `pdf-layout-picker.tsx`, `pdf-style-constructor.tsx`
+- Дефолты: `constants/pdf-layouts.ts`
+- Рендер: `core/pdf/`
 
 ---
 
@@ -217,6 +419,11 @@ export-pdf.ts     → expo-print → PDF файл → expo-sharing
 
 | Задача | Файлы |
 |--------|-------|
+| **Новый встроенный шаблон** | `core/templates/definitions/*.ts` → `definitions/index.ts` |
+| Поля встроенного шаблона | Тот же файл definition (через `defineField`) |
+| Вид PDF (HTML/CSS) | `core/pdf/parts/*`, `core/pdf/styles.ts` |
+| Новый пресет макета PDF | `constants/pdf-layouts.ts` + i18n |
+| Конструктор PDF в UI | `components/pdf-style-constructor.tsx` |
 | Текст на экране | `i18n/locales/uk.ts`, `ru.ts`, `types.ts` |
 | Цвета / отступы UI | `constants/app-design.ts` |
 | Главная страница | `app/index.tsx`, `components/document-card.tsx` |
@@ -226,9 +433,9 @@ export-pdf.ts     → expo-print → PDF файл → expo-sharing
 | Список шаблонов | `app/templates/index.tsx` |
 | Создание шаблона | `app/templates/create.tsx` |
 | Редактирование шаблона | `app/templates/edit/[id].tsx` |
-| Поля встроенных шаблонов (Договор и т.д.) | `constants/default-templates.ts` |
+| Поля встроенных шаблонов (Договор и т.д.) | `core/templates/definitions/` |
 | Редактор поля шаблона | `components/template-field-editor.tsx` |
-| Вид PDF (макеты) | `lib/pdf-templates.ts`, `constants/pdf-layouts.ts`, `components/pdf-layout-picker.tsx` |
+| Вид PDF (макеты) | `core/pdf/`, `constants/pdf-layouts.ts`, `components/pdf-layout-picker.tsx` |
 | Выбор макета PDF в форме | `create/[templateId].tsx`, `templates/create.tsx`, `templates/edit/[id].tsx` |
 | Сохранение документов | `lib/document-storage.ts` |
 | Сохранение шаблонов | `lib/template-storage.ts` |
@@ -312,4 +519,4 @@ TypeScript-проверка: `npx tsc --noEmit`
 
 ---
 
-*Документ актуален для структуры `src/` проекта mobile-docs (Expo SDK 56).*
+*Документ актуален для структуры `src/` проекта mobile-docs (Expo SDK 56). Ядро: `src/core/`.*
