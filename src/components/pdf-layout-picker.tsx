@@ -299,17 +299,6 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
 
       <View style={styles.actionsRow}>
         <PrimaryButton
-          label={showConstructor ? t('pdfStyle.hideConstructor') : t('pdfStyle.openConstructor')}
-          variant="secondary"
-          onPress={() => {
-            if (!showConstructor && value.layout !== 'custom') {
-              selectCustom();
-              return;
-            }
-            setShowConstructor((current) => !current);
-          }}
-        />
-        <PrimaryButton
           label={t('pdfStyle.saveStyle')}
           variant="secondary"
           onPress={() => setSaveModalVisible(true)}

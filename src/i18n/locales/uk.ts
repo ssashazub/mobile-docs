@@ -171,8 +171,6 @@ export const uk: TranslationSchema = {
     customLayout: 'Свій стиль',
     customLayoutDesc: 'Зберіть PDF у конструкторі',
     myStyles: 'Мої стилі',
-    openConstructor: 'Відкрити конструктор',
-    hideConstructor: 'Сховати конструктор',
     saveStyle: 'Зберегти стиль',
     saveStyleTitle: 'Назва стилю',
     styleNamePlaceholder: 'Наприклад: Фірмовий рахунок',

@@ -183,8 +183,6 @@ export const en: TranslationSchema = {
         customLayout: 'Custom style',
         customLayoutDesc: 'Build your PDF in the constructor',
         myStyles: 'My styles',
-        openConstructor: 'Open builder',
-        hideConstructor: 'Hide builder',
         saveStyle: 'Save style',
         saveStyleTitle: 'Style name',
         styleNamePlaceholder: 'For example: Branded invoice',

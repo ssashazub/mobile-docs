@@ -170,8 +170,6 @@ export type TranslationSchema = {
     customLayout: string;
     customLayoutDesc: string;
     myStyles: string;
-    openConstructor: string;
-    hideConstructor: string;
     saveStyle: string;
     saveStyleTitle: string;
     styleNamePlaceholder: string;
