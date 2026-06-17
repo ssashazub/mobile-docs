@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,7 +19,9 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { DEFAULT_PDF_STYLE } from '@/constants/pdf-layouts';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import {
   cloneTemplateFields,
   createBlankTemplate,
@@ -35,6 +37,8 @@ type BaseTemplateId = 'blank' | string;
 export default function CreateTemplateScreen() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const blank = createBlankTemplate();
 
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -46,7 +50,7 @@ export default function CreateTemplateScreen() {
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>({ ...DEFAULT_PDF_STYLE });
   const [saving, setSaving] = useState(false);
 
-  const colors = TEMPLATE_COLOR_PRESETS[colorIndex];
+  const colorPreset = TEMPLATE_COLOR_PRESETS[colorIndex];
 
   const loadTemplates = useCallback(async () => {
     setTemplates(await getTemplates());
@@ -119,8 +123,8 @@ export default function CreateTemplateScreen() {
         id: getNextCustomTemplateId(),
         title: title.trim(),
         emoji: emoji.trim() || '📝',
-        accentColor: colors.accentColor,
-        gradientEnd: colors.gradientEnd,
+        accentColor: colorPreset.accentColor,
+        gradientEnd: colorPreset.gradientEnd,
         fields,
         pdfStyle,
         isBuiltIn: false,
@@ -210,8 +214,8 @@ export default function CreateTemplateScreen() {
 
           <PdfLayoutPicker
             value={pdfStyle}
-            accentColor={colors.accentColor}
-            gradientEnd={colors.gradientEnd}
+            accentColor={colorPreset.accentColor}
+            gradientEnd={colorPreset.gradientEnd}
             onChange={setPdfStyle}
           />
 
@@ -222,7 +226,7 @@ export default function CreateTemplateScreen() {
               value={title}
               onChangeText={setTitle}
               placeholder={t('templates.examplePlaceholder')}
-              placeholderTextColor={AppDesign.textMuted}
+              placeholderTextColor={colors.textMuted}
             />
 
             <Text style={styles.label}>{t('common.emoji')}</Text>
@@ -231,7 +235,7 @@ export default function CreateTemplateScreen() {
               value={emoji}
               onChangeText={setEmoji}
               placeholder="📝"
-              placeholderTextColor={AppDesign.textMuted}
+              placeholderTextColor={colors.textMuted}
               maxLength={4}
             />
 
@@ -286,83 +290,85 @@ export default function CreateTemplateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: AppDesign.background },
-  content: { padding: 24, gap: 16 },
-  heading: { fontSize: 28, fontWeight: '800', color: AppDesign.text },
-  subheading: { fontSize: 14, color: AppDesign.textSecondary, lineHeight: 20 },
-  baseSection: { gap: 8 },
-  baseTitle: { fontSize: 18, fontWeight: '800', color: AppDesign.text },
-  baseSubtitle: { fontSize: 13, lineHeight: 19, color: AppDesign.textSecondary },
-  baseList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  baseCard: {
-    width: '47%',
-    flexGrow: 1,
-    minWidth: 124,
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.md,
-    borderWidth: 2,
-    borderColor: AppDesign.border,
-    padding: 12,
-    gap: 4,
-    ...AppDesign.cardShadow,
-  },
-  baseCardSelected: {
-    backgroundColor: '#f8fafc',
-    borderColor: AppDesign.primary,
-  },
-  baseEmoji: { fontSize: 24 },
-  baseCardTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: AppDesign.text,
-    lineHeight: 17,
-  },
-  baseCardTitleSelected: {
-    color: AppDesign.primary,
-  },
-  baseCardMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: AppDesign.textSecondary,
-  },
-  card: {
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.lg,
-    borderWidth: 1,
-    borderColor: AppDesign.border,
-    padding: 16,
-    gap: 8,
-  },
-  label: { fontSize: 13, fontWeight: '700', color: AppDesign.textSecondary, marginTop: 4 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: AppDesign.text,
-    backgroundColor: AppDesign.backgroundSoft,
-  },
-  colors: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
-  colorDot: { width: 34, height: 34, borderRadius: 17 },
-  colorDotActive: { borderWidth: 3, borderColor: '#0f172a' },
-  fieldsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  fieldsTitle: { fontSize: 18, fontWeight: '800', color: AppDesign.text },
-  addField: {
-    backgroundColor: AppDesign.primarySoft,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  addFieldText: { color: AppDesign.primary, fontWeight: '800', fontSize: 13 },
-  fields: { gap: 12 },
-  actions: { gap: 10, marginTop: 8 },
-  pressed: { opacity: 0.88 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
+    content: { padding: 24, gap: 16 },
+    heading: { fontSize: 28, fontWeight: '800', color: colors.text },
+    subheading: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+    baseSection: { gap: 8 },
+    baseTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+    baseSubtitle: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+    baseList: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      paddingVertical: 4,
+    },
+    baseCard: {
+      width: '47%',
+      flexGrow: 1,
+      minWidth: 124,
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      padding: 12,
+      gap: 4,
+      ...AppDesign.cardShadow,
+    },
+    baseCardSelected: {
+      backgroundColor: colors.backgroundSoft,
+      borderColor: colors.primary,
+    },
+    baseEmoji: { fontSize: 24 },
+    baseCardTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: colors.text,
+      lineHeight: 17,
+    },
+    baseCardTitleSelected: {
+      color: colors.primary,
+    },
+    baseCardMeta: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      gap: 8,
+    },
+    label: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginTop: 4 },
+    input: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+      backgroundColor: colors.backgroundSoft,
+    },
+    colors: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+    colorDot: { width: 34, height: 34, borderRadius: 17 },
+    colorDotActive: { borderWidth: 3, borderColor: colors.text },
+    fieldsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    fieldsTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+    addField: {
+      backgroundColor: colors.primarySoft,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+    addFieldText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+    fields: { gap: 12 },
+    actions: { gap: 10, marginTop: 8 },
+    pressed: { opacity: 0.88 },
+  });
+}

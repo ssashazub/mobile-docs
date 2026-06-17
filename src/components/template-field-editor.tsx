@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import type { t } from '@/i18n';
 import type { FieldInputKind } from '@/types/field-validation';
 import type { TemplateField } from '@/types/template';
@@ -41,6 +44,8 @@ export function TemplateFieldEditor({
   canDelete,
 }: TemplateFieldEditorProps) {
   const { t } = useI18n();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const selectedKind = field.kind ?? 'text';
 
   const setKind = (kind: FieldInputKind) => {
@@ -70,7 +75,7 @@ export function TemplateFieldEditor({
         value={field.label}
         onChangeText={(label) => onChange({ ...field, label })}
         placeholder={t('home.client')}
-        placeholderTextColor={AppDesign.textMuted}
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="sentences"
         keyboardType="default"
       />
@@ -81,7 +86,7 @@ export function TemplateFieldEditor({
         value={field.placeholder ?? ''}
         onChangeText={(placeholder) => onChange({ ...field, placeholder })}
         placeholder={t('templates.placeholderHint')}
-        placeholderTextColor={AppDesign.textMuted}
+        placeholderTextColor={colors.textMuted}
         autoCapitalize="sentences"
         keyboardType="default"
       />
@@ -115,8 +120,8 @@ export function TemplateFieldEditor({
           value={!!field.multiline}
           onValueChange={(multiline) => onChange({ ...field, multiline })}
           disabled={selectedKind !== 'text'}
-          trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
-          thumbColor={field.multiline ? AppDesign.primary : '#f8fafc'}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={field.multiline ? colors.primary : colors.backgroundElement}
         />
       </View>
 
@@ -125,100 +130,102 @@ export function TemplateFieldEditor({
         <Switch
           value={!!field.required}
           onValueChange={(required) => onChange({ ...field, required })}
-          trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
-          thumbColor={field.required ? AppDesign.primary : '#f8fafc'}
+          trackColor={{ false: colors.border, true: colors.primary }}
+          thumbColor={field.required ? colors.primary : colors.backgroundElement}
         />
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.md,
-    borderWidth: 1,
-    borderColor: AppDesign.border,
-    padding: 16,
-    gap: 8,
-    ...AppDesign.cardShadow,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  index: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: AppDesign.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  delete: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: AppDesign.dangerSoft,
-  },
-  deleteText: {
-    color: AppDesign.danger,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: AppDesign.textSecondary,
-    marginTop: 4,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: AppDesign.text,
-    backgroundColor: AppDesign.backgroundSoft,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  switchLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: AppDesign.text,
-  },
-  kindRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  kindChip: {
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: AppDesign.backgroundSoft,
-  },
-  kindChipSelected: {
-    borderColor: AppDesign.primary,
-    backgroundColor: '#eef2ff',
-  },
-  kindChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: AppDesign.textSecondary,
-  },
-  kindChipTextSelected: {
-    color: AppDesign.primary,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      gap: 8,
+      ...AppDesign.cardShadow,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    index: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: colors.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+    },
+    delete: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: colors.dangerSoft,
+    },
+    deleteText: {
+      color: colors.danger,
+      fontWeight: '700',
+      fontSize: 12,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+    label: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+      backgroundColor: colors.backgroundElement,
+    },
+    switchRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    switchLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    kindRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    kindChip: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: colors.backgroundSoft,
+    },
+    kindChipSelected: {
+      borderColor: colors.primary,
+      backgroundColor: colors.chipSelected,
+    },
+    kindChipText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    kindChipTextSelected: {
+      color: colors.primary,
+    },
+  });
+}

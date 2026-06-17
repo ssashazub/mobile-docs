@@ -1,17 +1,18 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+
+import { ThemePreferenceProvider } from '@/contexts/theme-preference-context';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { t } from '@/i18n';
 
-export default function RootLayout() {
+function RootNavigator() {
   const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? 'dark' : 'light';
-  const colors = Colors[theme];
+  const colors = Colors[colorScheme];
 
   return (
     <>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
@@ -28,5 +29,13 @@ export default function RootLayout() {
         <Stack.Screen name="explore" options={{ title: 'Explore' }} />
       </Stack>
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemePreferenceProvider>
+      <RootNavigator />
+    </ThemePreferenceProvider>
   );
 }

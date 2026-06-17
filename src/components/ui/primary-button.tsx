@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -9,7 +10,8 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { AppDesign } from '@/constants/app-design';
-import { Spacing } from '@/constants/theme';
+import { Spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 type PrimaryButtonProps = Omit<PressableProps, 'style'> & {
   label: string;
@@ -17,12 +19,6 @@ type PrimaryButtonProps = Omit<PressableProps, 'style'> & {
   variant?: 'primary' | 'secondary' | 'danger';
   style?: StyleProp<ViewStyle>;
 };
-
-const variantStyles = {
-  primary: { backgroundColor: AppDesign.primary },
-  secondary: { backgroundColor: '#64748b' },
-  danger: { backgroundColor: AppDesign.danger },
-} as const;
 
 export function PrimaryButton({
   label,
@@ -32,7 +28,15 @@ export function PrimaryButton({
   style,
   ...props
 }: PrimaryButtonProps) {
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isDisabled = disabled || loading;
+
+  const variantStyles = {
+    primary: { backgroundColor: colors.primary },
+    secondary: { backgroundColor: colors.secondaryButton },
+    danger: { backgroundColor: colors.danger },
+  } as const;
 
   return (
     <Pressable
@@ -56,27 +60,29 @@ export function PrimaryButton({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    borderRadius: AppDesign.radius.md,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 54,
-    ...AppDesign.shadow,
-  },
-  label: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.985 }],
-  },
-});
+function createStyles(_colors: ThemeColors) {
+  return StyleSheet.create({
+    button: {
+      borderRadius: AppDesign.radius.md,
+      paddingVertical: Spacing.three,
+      paddingHorizontal: Spacing.four,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 54,
+      ...AppDesign.shadow,
+    },
+    label: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    pressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.985 }],
+    },
+  });
+}

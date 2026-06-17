@@ -199,4 +199,11 @@ export const ru: TranslationSchema = {
     fontSerif: 'Serif',
     fontMono: 'Mono',
   },
+  theme: {
+    appearance: 'Оформление',
+    light: 'Светлая',
+    dark: 'Тёмная',
+    system: 'Устройство',
+    expandHint: 'Открыть выбор темы',
+  },
 };

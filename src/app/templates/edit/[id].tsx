@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,7 +18,9 @@ import { TemplateFieldEditor } from '@/components/template-field-editor';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import { createEmptyField, normalizePdfStyle } from '@/lib/template-helpers';
 import { getTemplateById, resetTemplateToDefault, saveTemplate } from '@/lib/template-storage';
 import type { DocumentTemplate, PdfStyle, TemplateField } from '@/types/template';
@@ -27,6 +29,8 @@ export default function EditTemplateScreen() {
   const { t } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [template, setTemplate] = useState<DocumentTemplate | null>(null);
   const [title, setTitle] = useState('');
@@ -36,6 +40,8 @@ export default function EditTemplateScreen() {
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>(normalizePdfStyle(undefined));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const colorPreset = TEMPLATE_COLOR_PRESETS[colorIndex];
 
   const loadTemplate = useCallback(async () => {
     if (!id) {
@@ -101,13 +107,12 @@ export default function EditTemplateScreen() {
     setSaving(true);
 
     try {
-      const colors = TEMPLATE_COLOR_PRESETS[colorIndex];
       await saveTemplate({
         ...template,
         title: title.trim(),
         emoji: emoji.trim() || '📝',
-        accentColor: colors.accentColor,
-        gradientEnd: colors.gradientEnd,
+        accentColor: colorPreset.accentColor,
+        gradientEnd: colorPreset.gradientEnd,
         fields,
         pdfStyle,
       });
@@ -175,7 +180,7 @@ export default function EditTemplateScreen() {
               value={title}
               onChangeText={setTitle}
               placeholder={t('templates.templateName')}
-              placeholderTextColor={AppDesign.textMuted}
+              placeholderTextColor={colors.textMuted}
             />
 
             <Text style={styles.label}>{t('common.emoji')}</Text>
@@ -184,7 +189,7 @@ export default function EditTemplateScreen() {
               value={emoji}
               onChangeText={setEmoji}
               placeholder="📝"
-              placeholderTextColor={AppDesign.textMuted}
+              placeholderTextColor={colors.textMuted}
               maxLength={4}
             />
 
@@ -206,8 +211,8 @@ export default function EditTemplateScreen() {
 
           <PdfLayoutPicker
             value={pdfStyle}
-            accentColor={TEMPLATE_COLOR_PRESETS[colorIndex].accentColor}
-            gradientEnd={TEMPLATE_COLOR_PRESETS[colorIndex].gradientEnd}
+            accentColor={colorPreset.accentColor}
+            gradientEnd={colorPreset.gradientEnd}
             onChange={setPdfStyle}
           />
 
@@ -256,52 +261,54 @@ export default function EditTemplateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: AppDesign.background },
-  content: { padding: 24, gap: 16 },
-  heading: { fontSize: 28, fontWeight: '800', color: AppDesign.text },
-  subheading: { fontSize: 14, color: AppDesign.textSecondary, lineHeight: 20 },
-  card: {
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.lg,
-    borderWidth: 1,
-    borderColor: AppDesign.border,
-    padding: 16,
-    gap: 8,
-  },
-  label: { fontSize: 13, fontWeight: '700', color: AppDesign.textSecondary, marginTop: 4 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: AppDesign.text,
-    backgroundColor: AppDesign.backgroundSoft,
-  },
-  colors: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
-  colorDot: { width: 34, height: 34, borderRadius: 17 },
-  colorDotActive: { borderWidth: 3, borderColor: '#0f172a' },
-  fieldsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  fieldsTitle: { fontSize: 18, fontWeight: '800', color: AppDesign.text },
-  addField: {
-    backgroundColor: AppDesign.primarySoft,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  addFieldText: { color: AppDesign.primary, fontWeight: '800', fontSize: 13 },
-  fields: { gap: 12 },
-  actions: { gap: 10, marginTop: 8 },
-  pressed: { opacity: 0.88 },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-    backgroundColor: AppDesign.background,
-  },
-  loadingText: { fontSize: 16, fontWeight: '600', color: AppDesign.text },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
+    content: { padding: 24, gap: 16 },
+    heading: { fontSize: 28, fontWeight: '800', color: colors.text },
+    subheading: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      gap: 8,
+    },
+    label: { fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginTop: 4 },
+    input: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+      backgroundColor: colors.backgroundSoft,
+    },
+    colors: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+    colorDot: { width: 34, height: 34, borderRadius: 17 },
+    colorDotActive: { borderWidth: 3, borderColor: colors.text },
+    fieldsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    fieldsTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+    addField: {
+      backgroundColor: colors.primarySoft,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+    },
+    addFieldText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+    fields: { gap: 12 },
+    actions: { gap: 10, marginTop: 8 },
+    pressed: { opacity: 0.88 },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      gap: 12,
+      backgroundColor: colors.background,
+    },
+    loadingText: { fontSize: 16, fontWeight: '600', color: colors.text },
+  });
+}

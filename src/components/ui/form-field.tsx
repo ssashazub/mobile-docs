@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppDesign } from '@/constants/app-design';
-import { Spacing } from '@/constants/theme';
+import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type FormFieldProps = TextInputProps & {
@@ -22,21 +22,22 @@ const multilingualDefaults: Partial<TextInputProps> = {
 
 export function FormField({ label, style, onFocus, onBlur, ...inputProps }: FormFieldProps) {
   const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [focused, setFocused] = useState(false);
 
   return (
     <View style={styles.field}>
-      <ThemedText type="smallBold" style={styles.label}>
+      <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
         {label}
       </ThemedText>
       <TextInput
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textMuted}
         style={[
           styles.input,
           {
             color: colors.text,
-            backgroundColor: AppDesign.surface,
-            borderColor: focused ? AppDesign.primary : AppDesign.border,
+            backgroundColor: colors.backgroundElement,
+            borderColor: focused ? colors.primary : colors.border,
           },
           focused && styles.inputFocused,
           style,
@@ -56,27 +57,28 @@ export function FormField({ label, style, onFocus, onBlur, ...inputProps }: Form
   );
 }
 
-const styles = StyleSheet.create({
-  field: {
-    gap: Spacing.one,
-  },
-  label: {
-    marginLeft: Spacing.one,
-    color: AppDesign.textSecondary,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderRadius: AppDesign.radius.md,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 4,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  inputFocused: {
-    shadowColor: AppDesign.primary,
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    field: {
+      gap: Spacing.one,
+    },
+    label: {
+      marginLeft: Spacing.one,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderRadius: AppDesign.radius.md,
+      paddingHorizontal: Spacing.three,
+      paddingVertical: Spacing.two + 4,
+      fontSize: 16,
+      lineHeight: 22,
+    },
+    inputFocused: {
+      shadowColor: colors.primary,
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+  });
+}

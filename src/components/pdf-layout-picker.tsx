@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -16,7 +16,9 @@ import { PdfStyleConstructor } from '@/components/pdf-style-constructor';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AppDesign } from '@/constants/app-design';
 import { DEFAULT_PDF_DESIGN, LAYOUT_DESIGN_PRESETS, PDF_LAYOUTS } from '@/constants/pdf-layouts';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import { createSavedPdfStyleFromPdfStyle, getSavedPdfStyles } from '@/lib/pdf-style-storage';
 import { mergePdfDesign, pdfStyleFromSavedStyle, resolvePdfDesign } from '@/lib/pdf-style-resolver';
 import type { SavedPdfStyle } from '@/types/pdf-style-design';
@@ -49,6 +51,8 @@ type LayoutDescKey =
   | 'templates.pdfLayoutBoldDesc'
   | 'templates.pdfLayoutSidebarDesc';
 
+type LayoutPickerStyles = ReturnType<typeof createStyles>;
+
 const LAYOUT_LABELS: Record<PdfLayout, { title: LayoutTitleKey; desc: LayoutDescKey }> = {
   classic: { title: 'templates.pdfLayoutClassic', desc: 'templates.pdfLayoutClassicDesc' },
   minimal: { title: 'templates.pdfLayoutMinimal', desc: 'templates.pdfLayoutMinimalDesc' },
@@ -64,10 +68,12 @@ function LayoutPreview({
   layout,
   accentColor,
   selected,
+  styles,
 }: {
   layout: PdfLayout | 'custom';
   accentColor: string;
   selected: boolean;
+  styles: LayoutPickerStyles;
 }) {
   if (layout === 'custom') {
     return (
@@ -144,6 +150,8 @@ function LayoutPreview({
 
 export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: PdfLayoutPickerProps) {
   const { t } = useI18n();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [savedStyles, setSavedStyles] = useState<SavedPdfStyle[]>([]);
   const [showConstructor, setShowConstructor] = useState(value.layout === 'custom');
   const [saveModalVisible, setSaveModalVisible] = useState(false);
@@ -244,7 +252,7 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
                 pressed && styles.pressed,
               ]}
             >
-              <LayoutPreview layout={layout} accentColor={accentColor} selected={selected} />
+              <LayoutPreview layout={layout} accentColor={accentColor} selected={selected} styles={styles} />
               <Text style={[styles.cardTitle, selected && { color: accentColor }]}>
                 {t(labels.title)}
               </Text>
@@ -262,7 +270,7 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
             pressed && styles.pressed,
           ]}
         >
-          <LayoutPreview layout="custom" accentColor={accentColor} selected={isCustomSelected} />
+          <LayoutPreview layout="custom" accentColor={accentColor} selected={isCustomSelected} styles={styles} />
           <Text style={[styles.cardTitle, isCustomSelected && { color: accentColor }]}>
             {t('pdfStyle.customLayout')}
           </Text>
@@ -283,7 +291,7 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
                   onPress={() => selectSavedStyle(saved)}
                   style={({ pressed }) => [
                     styles.savedChip,
-                    selected && { borderColor: accentColor, backgroundColor: '#eef2ff' },
+                    selected && { borderColor: accentColor, backgroundColor: colors.chipSelected },
                     pressed && styles.pressed,
                   ]}
                 >
@@ -320,8 +328,8 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
           <Switch
             value={value.showDate}
             onValueChange={(showDate) => onChange({ ...value, showDate })}
-            trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
-            thumbColor={value.showDate ? accentColor : '#f8fafc'}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={value.showDate ? colors.primary : colors.backgroundElement}
           />
         </View>
         <View style={styles.toggleRow}>
@@ -329,8 +337,8 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
           <Switch
             value={value.showFooter}
             onValueChange={(showFooter) => onChange({ ...value, showFooter })}
-            trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
-            thumbColor={value.showFooter ? accentColor : '#f8fafc'}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor={value.showFooter ? colors.primary : colors.backgroundElement}
           />
         </View>
       </View>
@@ -344,7 +352,7 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
               value={styleName}
               onChangeText={setStyleName}
               placeholder={t('pdfStyle.styleNamePlaceholder')}
-              placeholderTextColor={AppDesign.textMuted}
+              placeholderTextColor={colors.textMuted}
               autoFocus
             />
             <View style={styles.modalActions}>
@@ -365,130 +373,132 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: 10 },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  headerText: { flex: 1, gap: 4 },
-  title: { fontSize: 18, fontWeight: '800', color: AppDesign.text },
-  subtitle: { fontSize: 13, lineHeight: 19, color: AppDesign.textSecondary },
-  manageLink: { paddingVertical: 4, paddingHorizontal: 2 },
-  manageLinkText: { color: AppDesign.primary, fontWeight: '700', fontSize: 13 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: {
-    width: '48%',
-    flexGrow: 1,
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.md,
-    borderWidth: 2,
-    borderColor: AppDesign.border,
-    padding: 12,
-    gap: 8,
-    ...AppDesign.cardShadow,
-  },
-  cardSelected: { backgroundColor: '#f8fafc' },
-  pressed: { opacity: 0.92 },
-  cardTitle: { fontSize: 14, fontWeight: '800', color: AppDesign.text },
-  cardDesc: { fontSize: 11, lineHeight: 15, color: AppDesign.textSecondary },
-  preview: {
-    height: 72,
-    borderRadius: 8,
-    backgroundColor: AppDesign.backgroundSoft,
-    padding: 8,
-    gap: 4,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  previewSelected: { borderColor: '#c7d2fe' },
-  classicHero: { height: 18, borderRadius: 6 },
-  classicSectionTitle: { height: 4, width: '55%', borderRadius: 2, opacity: 0.85 },
-  classicSectionBody: { height: 8, backgroundColor: '#e2e8f0', borderRadius: 3 },
-  minimalLine: { height: 2, backgroundColor: '#e2e8f0', marginBottom: 2 },
-  minimalTitle: { height: 10, width: '70%', backgroundColor: '#cbd5e1', borderRadius: 3, marginBottom: 4 },
-  minimalField: { height: 12, backgroundColor: '#f1f5f9', borderRadius: 3 },
-  minimalFieldShort: { height: 8, width: '80%', backgroundColor: '#f1f5f9', borderRadius: 3 },
-  formalHeader: { height: 10, backgroundColor: '#0f172a', borderRadius: 2, marginBottom: 4, opacity: 0.15 },
-  formalRow: { flexDirection: 'row', gap: 3, flex: 1 },
-  formalLabel: { flex: 1, backgroundColor: '#f1f5f9', borderRadius: 2, borderWidth: 1, borderColor: '#e2e8f0' },
-  formalValue: { flex: 1.4, backgroundColor: '#fff', borderRadius: 2, borderWidth: 1, borderColor: '#e2e8f0' },
-  compactHero: { height: 14, borderRadius: 4, marginBottom: 2 },
-  compactGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, flex: 1 },
-  compactCell: {
-    width: '48%',
-    flexGrow: 1,
-    backgroundColor: '#fff',
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minHeight: 14,
-  },
-  sidebarPreview: { flexDirection: 'row', padding: 0, gap: 0 },
-  sidebarBar: { width: 8, height: '100%' },
-  sidebarContent: { flex: 1, padding: 8, gap: 4 },
-  customGrid: { flexDirection: 'row', gap: 4, marginBottom: 6 },
-  customDot: { width: 10, height: 10, borderRadius: 5 },
-  customBars: { gap: 4 },
-  customBar: { height: 8, backgroundColor: '#e2e8f0', borderRadius: 3 },
-  customBarShort: { width: '65%' },
-  savedSection: { gap: 8 },
-  savedTitle: { fontSize: 14, fontWeight: '800', color: AppDesign.text },
-  savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  savedChip: {
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: AppDesign.surface,
-  },
-  savedChipText: { fontSize: 13, fontWeight: '700', color: AppDesign.textSecondary },
-  actionsRow: { flexDirection: 'row', gap: 10 },
-  toggles: {
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.md,
-    borderWidth: 1,
-    borderColor: AppDesign.border,
-    padding: 4,
-    marginTop: 4,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  toggleLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: AppDesign.text, paddingRight: 12 },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.lg,
-    padding: 20,
-    gap: 14,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: AppDesign.text },
-  modalInput: {
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: AppDesign.text,
-    backgroundColor: AppDesign.backgroundSoft,
-  },
-  modalActions: { gap: 10 },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { gap: 10 },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    headerText: { flex: 1, gap: 4 },
+    title: { fontSize: 18, fontWeight: '800', color: colors.text },
+    subtitle: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
+    manageLink: { paddingVertical: 4, paddingHorizontal: 2 },
+    manageLinkText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    card: {
+      width: '48%',
+      flexGrow: 1,
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.md,
+      borderWidth: 2,
+      borderColor: colors.border,
+      padding: 12,
+      gap: 8,
+      ...AppDesign.cardShadow,
+    },
+    cardSelected: { backgroundColor: colors.backgroundSoft },
+    pressed: { opacity: 0.92 },
+    cardTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
+    cardDesc: { fontSize: 11, lineHeight: 15, color: colors.textSecondary },
+    preview: {
+      height: 72,
+      borderRadius: 8,
+      backgroundColor: colors.backgroundSoft,
+      padding: 8,
+      gap: 4,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    previewSelected: { borderColor: colors.primary },
+    classicHero: { height: 18, borderRadius: 6 },
+    classicSectionTitle: { height: 4, width: '55%', borderRadius: 2, opacity: 0.85 },
+    classicSectionBody: { height: 8, backgroundColor: colors.border, borderRadius: 3 },
+    minimalLine: { height: 2, backgroundColor: colors.border, marginBottom: 2 },
+    minimalTitle: { height: 10, width: '70%', backgroundColor: colors.textMuted, borderRadius: 3, marginBottom: 4 },
+    minimalField: { height: 12, backgroundColor: colors.backgroundSoft, borderRadius: 3 },
+    minimalFieldShort: { height: 8, width: '80%', backgroundColor: colors.backgroundSoft, borderRadius: 3 },
+    formalHeader: { height: 10, backgroundColor: colors.text, borderRadius: 2, marginBottom: 4, opacity: 0.15 },
+    formalRow: { flexDirection: 'row', gap: 3, flex: 1 },
+    formalLabel: { flex: 1, backgroundColor: colors.backgroundSoft, borderRadius: 2, borderWidth: 1, borderColor: colors.border },
+    formalValue: { flex: 1.4, backgroundColor: colors.surface, borderRadius: 2, borderWidth: 1, borderColor: colors.border },
+    compactHero: { height: 14, borderRadius: 4, marginBottom: 2 },
+    compactGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, flex: 1 },
+    compactCell: {
+      width: '48%',
+      flexGrow: 1,
+      backgroundColor: colors.surface,
+      borderRadius: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 14,
+    },
+    sidebarPreview: { flexDirection: 'row', padding: 0, gap: 0 },
+    sidebarBar: { width: 8, height: '100%' },
+    sidebarContent: { flex: 1, padding: 8, gap: 4 },
+    customGrid: { flexDirection: 'row', gap: 4, marginBottom: 6 },
+    customDot: { width: 10, height: 10, borderRadius: 5 },
+    customBars: { gap: 4 },
+    customBar: { height: 8, backgroundColor: colors.border, borderRadius: 3 },
+    customBarShort: { width: '65%' },
+    savedSection: { gap: 8 },
+    savedTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
+    savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    savedChip: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      backgroundColor: colors.surface,
+    },
+    savedChipText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
+    actionsRow: { flexDirection: 'row', gap: 10 },
+    toggles: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 4,
+      marginTop: 4,
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    toggleLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text, paddingRight: 12 },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.lg,
+      padding: 20,
+      gap: 14,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
+    modalInput: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+      backgroundColor: colors.backgroundSoft,
+    },
+    modalActions: { gap: 10 },
+  });
+}

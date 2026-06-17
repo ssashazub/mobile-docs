@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,8 +26,9 @@ import { getFieldValidationAlert } from '@/lib/field-validation-alert';
 import { validatePdfFormFields, validateTemplateFields } from '@/lib/field-validation';
 import { normalizePdfStyle } from '@/lib/template-helpers';
 import { getTemplateById } from '@/lib/template-storage';
-import { Spacing } from '@/constants/theme';
+import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate, PdfStyle } from '@/types/template';
 
@@ -44,6 +45,8 @@ function parseDocumentId(id: string | string[] | undefined): number | null {
 
 export default function EditDocumentScreen() {
   const { t } = useI18n();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const documentId = parseDocumentId(id);
   const insets = useSafeAreaInsets();
@@ -303,48 +306,49 @@ export default function EditDocumentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: AppDesign.background,
-  },
-  flex: {
-    flex: 1,
-  },
-  content: {
-    padding: Spacing.four,
-    gap: Spacing.four,
-  },
-  typeBanner: {
-    borderRadius: AppDesign.radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignSelf: 'flex-start',
-  },
-  typeBannerText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  form: {
-    gap: Spacing.three,
-  },
-  hint: {
-    lineHeight: 22,
-  },
-  descriptionInput: {
-    minHeight: 120,
-    paddingTop: Spacing.two + 2,
-  },
-  actions: {
-    gap: Spacing.two,
-    marginTop: Spacing.two,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.four,
-    gap: Spacing.three,
-  },
-});
+function createStyles(_colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+    },
+    flex: {
+      flex: 1,
+    },
+    content: {
+      padding: Spacing.four,
+      gap: Spacing.four,
+    },
+    typeBanner: {
+      borderRadius: AppDesign.radius.md,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      alignSelf: 'flex-start',
+    },
+    typeBannerText: {
+      color: '#fff',
+      fontWeight: '800',
+      fontSize: 15,
+    },
+    form: {
+      gap: Spacing.three,
+    },
+    hint: {
+      lineHeight: 22,
+    },
+    descriptionInput: {
+      minHeight: 120,
+      paddingTop: Spacing.two + 2,
+    },
+    actions: {
+      gap: Spacing.two,
+      marginTop: Spacing.two,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: Spacing.four,
+      gap: Spacing.three,
+    },
+  });
+}

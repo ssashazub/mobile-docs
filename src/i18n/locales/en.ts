@@ -211,4 +211,11 @@ export const en: TranslationSchema = {
         fontSerif: 'Serif',
         fontMono: 'Mono',
     },
+    theme: {
+        appearance: 'Appearance',
+        light: 'Light',
+        dark: 'Dark',
+        system: 'System',
+        expandHint: 'Opens theme options',
+    },
 };

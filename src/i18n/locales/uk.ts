@@ -199,4 +199,11 @@ export const uk: TranslationSchema = {
     fontSerif: 'Serif',
     fontMono: 'Mono',
   },
+  theme: {
+    appearance: 'Оформлення',
+    light: 'Світла',
+    dark: 'Темна',
+    system: 'Пристрій',
+    expandHint: 'Відкрити вибір теми',
+  },
 };

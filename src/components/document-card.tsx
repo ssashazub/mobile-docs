@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import { getDocumentDisplayInfo } from '@/lib/document-display';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate } from '@/types/template';
@@ -21,6 +24,8 @@ export function DocumentCard({
   onLongPress,
 }: DocumentCardProps) {
   const { t, dateLocale } = useI18n();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const display = getDocumentDisplayInfo(document, template);
 
   return (
@@ -34,7 +39,7 @@ export function DocumentCard({
       style={({ pressed }) => [
         styles.card,
         pressed && styles.cardPressed,
-        { borderColor: pressed ? display.accentColor : AppDesign.border },
+        { borderColor: pressed ? display.accentColor : colors.border },
       ]}
     >
       <View style={[styles.accentStrip, { backgroundColor: display.accentColor }]} />
@@ -67,66 +72,68 @@ export function DocumentCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.lg,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-    ...AppDesign.cardShadow,
-  },
-  cardPressed: {
-    transform: [{ scale: 0.985 }],
-    opacity: 0.96,
-  },
-  accentStrip: {
-    height: 4,
-    width: '100%',
-  },
-  content: {
-    padding: 18,
-    gap: 8,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  date: {
-    fontSize: 12,
-    color: AppDesign.textMuted,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: AppDesign.text,
-    lineHeight: 24,
-  },
-  meta: {
-    fontSize: 14,
-    color: AppDesign.textSecondary,
-    fontWeight: '500',
-  },
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: AppDesign.textMuted,
-  },
-  hint: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#a5b4fc',
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: 1.5,
+      overflow: 'hidden',
+      ...AppDesign.cardShadow,
+    },
+    cardPressed: {
+      transform: [{ scale: 0.985 }],
+      opacity: 0.96,
+    },
+    accentStrip: {
+      height: 4,
+      width: '100%',
+    },
+    content: {
+      padding: 18,
+      gap: 8,
+    },
+    topRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 8,
+    },
+    badge: {
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    date: {
+      fontSize: 12,
+      color: colors.textMuted,
+      fontWeight: '600',
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+      lineHeight: 24,
+    },
+    meta: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    description: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textMuted,
+    },
+    hint: {
+      marginTop: 4,
+      fontSize: 11,
+      color: colors.hint,
+      fontWeight: '600',
+    },
+  });
+}

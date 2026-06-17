@@ -198,4 +198,11 @@ export type TranslationSchema = {
     fontSerif: string;
     fontMono: string;
   };
+  theme: {
+    appearance: string;
+    light: string;
+    dark: string;
+    system: string;
+    expandHint: string;
+  };
 };

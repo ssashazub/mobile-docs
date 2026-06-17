@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { ThemedText } from '@/components/themed-text';
 import { AppDesign } from '@/constants/app-design';
-import { Spacing } from '@/constants/theme';
+import { Spacing, type ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { isCheckboxChecked } from '@/lib/pdf-form';
 import type { PdfFormField } from '@/types/document';
 
@@ -19,16 +21,20 @@ function OptionPicker({
   value,
   onChange,
   mode,
+  styles,
+  colors,
 }: {
   label: string;
   options: string[];
   value: string;
   onChange: (value: string) => void;
   mode: 'radio' | 'dropdown';
+  styles: ReturnType<typeof createStyles>;
+  colors: ThemeColors;
 }) {
   return (
     <View style={styles.field}>
-      <ThemedText type="smallBold" style={styles.label}>
+      <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
         {label}
       </ThemedText>
       <View style={styles.options}>
@@ -45,8 +51,16 @@ function OptionPicker({
                 pressed && styles.optionPressed,
               ]}
             >
-              <View style={[styles.optionMarker, mode === 'radio' ? styles.radio : styles.dropdown]}>
-                {selected ? <View style={styles.optionMarkerFill} /> : null}
+              <View
+                style={[
+                  styles.optionMarker,
+                  mode === 'radio' ? styles.radio : styles.dropdown,
+                  { borderColor: colors.optionAccent },
+                ]}
+              >
+                {selected ? (
+                  <View style={[styles.optionMarkerFill, { backgroundColor: colors.optionAccent }]} />
+                ) : null}
               </View>
               <ThemedText style={styles.optionText}>{option}</ThemedText>
             </Pressable>
@@ -58,6 +72,9 @@ function OptionPicker({
 }
 
 export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputProps) {
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   if (field.type === 'checkbox') {
     return (
       <View style={styles.field}>
@@ -68,8 +85,8 @@ export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputP
           <Switch
             value={isCheckboxChecked(value)}
             onValueChange={(checked) => onChange(checked ? 'true' : 'false')}
-            trackColor={{ false: '#cbd5e1', true: '#99f6e4' }}
-            thumbColor={isCheckboxChecked(value) ? '#0f766e' : '#f8fafc'}
+            trackColor={{ false: colors.border, true: colors.optionAccent }}
+            thumbColor={isCheckboxChecked(value) ? colors.optionAccent : colors.backgroundElement}
           />
         </View>
       </View>
@@ -84,6 +101,8 @@ export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputP
         value={value}
         onChange={onChange}
         mode="radio"
+        styles={styles}
+        colors={colors}
       />
     );
   }
@@ -96,6 +115,8 @@ export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputP
         value={value}
         onChange={onChange}
         mode="dropdown"
+        styles={styles}
+        colors={colors}
       />
     );
   }
@@ -114,74 +135,72 @@ export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputP
   );
 }
 
-const styles = StyleSheet.create({
-  field: {
-    gap: Spacing.one,
-  },
-  label: {
-    marginLeft: Spacing.one,
-    color: AppDesign.textSecondary,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: AppDesign.surface,
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: AppDesign.radius.md,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-  },
-  checkboxLabel: {
-    flex: 1,
-    color: AppDesign.text,
-    paddingRight: Spacing.two,
-  },
-  options: {
-    gap: Spacing.two,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    backgroundColor: AppDesign.surface,
-    borderWidth: 1.5,
-    borderColor: AppDesign.border,
-    borderRadius: AppDesign.radius.md,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-  },
-  optionSelected: {
-    borderColor: '#0f766e',
-    backgroundColor: '#f0fdfa',
-  },
-  optionPressed: {
-    opacity: 0.92,
-  },
-  optionMarker: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#0f766e',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radio: {
-    borderRadius: 10,
-  },
-  dropdown: {
-    borderRadius: 4,
-  },
-  optionMarkerFill: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#0f766e',
-  },
-  optionText: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    field: {
+      gap: Spacing.one,
+    },
+    label: {
+      marginLeft: Spacing.one,
+    },
+    checkboxRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.backgroundElement,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: AppDesign.radius.md,
+      paddingHorizontal: Spacing.three,
+      paddingVertical: Spacing.two + 2,
+    },
+    checkboxLabel: {
+      flex: 1,
+      paddingRight: Spacing.two,
+    },
+    options: {
+      gap: Spacing.two,
+    },
+    option: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.two,
+      backgroundColor: colors.backgroundElement,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: AppDesign.radius.md,
+      paddingHorizontal: Spacing.three,
+      paddingVertical: Spacing.two + 2,
+    },
+    optionSelected: {
+      borderColor: colors.optionAccent,
+      backgroundColor: colors.optionSelected,
+    },
+    optionPressed: {
+      opacity: 0.92,
+    },
+    optionMarker: {
+      width: 20,
+      height: 20,
+      borderWidth: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radio: {
+      borderRadius: 10,
+    },
+    dropdown: {
+      borderRadius: 4,
+    },
+    optionMarkerFill: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    optionText: {
+      flex: 1,
+      fontSize: 15,
+      lineHeight: 21,
+    },
+  });
+}

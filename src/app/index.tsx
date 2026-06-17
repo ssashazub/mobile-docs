@@ -6,8 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
 import { DocumentCard } from '@/components/document-card';
+import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import { resolveTemplateForDocument } from '@/lib/document-display';
 import { deleteDocument as deleteStoredDocument, getDocuments } from '@/lib/document-storage';
 import { ImportCancelledError, pickAndImportPdf } from '@/lib/import-pdf';
@@ -17,6 +20,8 @@ import type { DocumentTemplate } from '@/types/template';
 
 export default function HomeScreen() {
     const { t, pluralDocuments } = useI18n();
+    const colors = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
     const [documents, setDocuments] = useState<Document[]>([]);
     const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
     const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
@@ -75,7 +80,10 @@ export default function HomeScreen() {
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
             <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
                 <View style={styles.hero}>
-                    <Text style={styles.heroKicker}>Mobile Docs</Text>
+                    <View style={styles.heroTopRow}>
+                        <Text style={styles.heroKicker}>Mobile Docs</Text>
+                        <ThemeSwitcher compact />
+                    </View>
                     <Text style={styles.heading}>{t('home.title')}</Text>
                     <Text style={styles.subheading}>
                         {documents.length} {pluralDocuments(documents.length)}
@@ -107,7 +115,7 @@ export default function HomeScreen() {
                     disabled={importing}
                 >
                     {importing ? (
-                        <ActivityIndicator color={AppDesign.primary} />
+                        <ActivityIndicator color={colors.primary} />
                     ) : (
                         <>
                             <Text style={styles.importTitle}>📥 {t('home.importPdf')}</Text>
@@ -189,135 +197,144 @@ export default function HomeScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: AppDesign.background,
-    },
-    container: {
-        flexGrow: 1,
-        padding: 24,
-        gap: 14,
-    },
-    hero: {
-        gap: 6,
-        paddingTop: 4,
-    },
-    heroKicker: {
-        fontSize: 12,
-        fontWeight: '800',
-        letterSpacing: 1.4,
-        textTransform: 'uppercase',
-        color: '#818cf8',
-    },
-    heading: {
-        fontSize: 34,
-        fontWeight: '800',
-        color: AppDesign.text,
-        lineHeight: 40,
-    },
-    subheading: {
-        fontSize: 15,
-        color: AppDesign.textSecondary,
-    },
-    createButton: {
-        borderRadius: AppDesign.radius.lg,
-        overflow: 'hidden',
-        ...AppDesign.shadow,
-    },
-    createButtonPressed: {
-        opacity: 0.94,
-        transform: [{ scale: 0.985 }],
-    },
-    createGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 14,
-        padding: 20,
-    },
-    createEmoji: {
-        fontSize: 28,
-    },
-    createTextWrap: {
-        flex: 1,
-        gap: 2,
-    },
-    createButtonTitle: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: '800',
-    },
-    createButtonSubtitle: {
-        color: 'rgba(255,255,255,0.88)',
-        fontSize: 13,
-    },
-    createArrow: {
-        color: '#fff',
-        fontSize: 24,
-        fontWeight: '800',
-    },
-    importButton: {
-        backgroundColor: AppDesign.surface,
-        borderRadius: AppDesign.radius.lg,
-        borderWidth: 1,
-        borderColor: '#99f6e4',
-        padding: 16,
-        gap: 4,
-        minHeight: 72,
-        justifyContent: 'center',
-    },
-    importTitle: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#0f766e',
-    },
-    importSubtitle: {
-        fontSize: 13,
-        color: AppDesign.textSecondary,
-    },
-    templatesButton: {
-        backgroundColor: AppDesign.surface,
-        borderRadius: AppDesign.radius.lg,
-        borderWidth: 1,
-        borderColor: '#c7d2fe',
-        padding: 16,
-        gap: 4,
-    },
-    templatesTitle: {
-        fontSize: 15,
-        fontWeight: '800',
-        color: AppDesign.primary,
-    },
-    templatesSubtitle: {
-        fontSize: 13,
-        color: AppDesign.textSecondary,
-    },
-    emptyState: {
-        backgroundColor: AppDesign.surface,
-        borderRadius: AppDesign.radius.lg,
-        borderWidth: 1,
-        borderColor: AppDesign.border,
-        padding: 28,
-        alignItems: 'center',
-        gap: 8,
-        ...AppDesign.cardShadow,
-    },
-    emptyEmoji: {
-        fontSize: 36,
-        marginBottom: 4,
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: AppDesign.text,
-    },
-    emptyText: {
-        fontSize: 14,
-        lineHeight: 21,
-        color: AppDesign.textSecondary,
-        textAlign: 'center',
-    },
-    list: {
-        gap: 14,
-    },
-});
+function createStyles(colors: ThemeColors) {
+    return StyleSheet.create({
+        safeArea: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        container: {
+            flexGrow: 1,
+            padding: 24,
+            gap: 14,
+        },
+        hero: {
+            gap: 6,
+            paddingTop: 4,
+        },
+        heroTopRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+        },
+        heroKicker: {
+            fontSize: 12,
+            fontWeight: '800',
+            letterSpacing: 1.4,
+            textTransform: 'uppercase',
+            color: colors.hint,
+            flex: 1,
+        },
+        heading: {
+            fontSize: 34,
+            fontWeight: '800',
+            color: colors.text,
+            lineHeight: 40,
+        },
+        subheading: {
+            fontSize: 15,
+            color: colors.textSecondary,
+        },
+        createButton: {
+            borderRadius: AppDesign.radius.lg,
+            overflow: 'hidden',
+            ...AppDesign.shadow,
+        },
+        createButtonPressed: {
+            opacity: 0.94,
+            transform: [{ scale: 0.985 }],
+        },
+        createGradient: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+            padding: 20,
+        },
+        createEmoji: {
+            fontSize: 28,
+        },
+        createTextWrap: {
+            flex: 1,
+            gap: 2,
+        },
+        createButtonTitle: {
+            color: '#fff',
+            fontSize: 18,
+            fontWeight: '800',
+        },
+        createButtonSubtitle: {
+            color: 'rgba(255,255,255,0.88)',
+            fontSize: 13,
+        },
+        createArrow: {
+            color: '#fff',
+            fontSize: 24,
+            fontWeight: '800',
+        },
+        importButton: {
+            backgroundColor: colors.surface,
+            borderRadius: AppDesign.radius.lg,
+            borderWidth: 1,
+            borderColor: colors.importBorder,
+            padding: 16,
+            gap: 4,
+            minHeight: 72,
+            justifyContent: 'center',
+        },
+        importTitle: {
+            fontSize: 15,
+            fontWeight: '800',
+            color: colors.importTitle,
+        },
+        importSubtitle: {
+            fontSize: 13,
+            color: colors.textSecondary,
+        },
+        templatesButton: {
+            backgroundColor: colors.surface,
+            borderRadius: AppDesign.radius.lg,
+            borderWidth: 1,
+            borderColor: colors.templatesBorder,
+            padding: 16,
+            gap: 4,
+        },
+        templatesTitle: {
+            fontSize: 15,
+            fontWeight: '800',
+            color: colors.primary,
+        },
+        templatesSubtitle: {
+            fontSize: 13,
+            color: colors.textSecondary,
+        },
+        emptyState: {
+            backgroundColor: colors.surface,
+            borderRadius: AppDesign.radius.lg,
+            borderWidth: 1,
+            borderColor: colors.border,
+            padding: 28,
+            alignItems: 'center',
+            gap: 8,
+            ...AppDesign.cardShadow,
+        },
+        emptyEmoji: {
+            fontSize: 36,
+            marginBottom: 4,
+        },
+        emptyTitle: {
+            fontSize: 18,
+            fontWeight: '800',
+            color: colors.text,
+        },
+        emptyText: {
+            fontSize: 14,
+            lineHeight: 21,
+            color: colors.textSecondary,
+            textAlign: 'center',
+        },
+        list: {
+            gap: 14,
+        },
+    });
+}

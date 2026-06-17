@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import type { DocumentTemplate } from '@/types/template';
 
 type DocumentTypeCardProps = {
@@ -13,6 +16,8 @@ type DocumentTypeCardProps = {
 
 export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCardProps) {
   const { t } = useI18n();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <Pressable
@@ -55,73 +60,75 @@ export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCard
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: AppDesign.surface,
-    borderRadius: AppDesign.radius.lg,
-    borderWidth: 1,
-    borderColor: AppDesign.border,
-    overflow: 'hidden',
-    ...AppDesign.cardShadow,
-  },
-  cardPressed: {
-    opacity: 0.94,
-    transform: [{ scale: 0.985 }],
-  },
-  gradientHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 20,
-  },
-  emoji: {
-    fontSize: 30,
-  },
-  headerText: {
-    flex: 1,
-    gap: 2,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
-  },
-  meta: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.88)',
-    fontWeight: '600',
-  },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editPressed: {
-    opacity: 0.8,
-  },
-  editText: {
-    fontSize: 18,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    backgroundColor: AppDesign.backgroundSoft,
-  },
-  footerText: {
-    flex: 1,
-    fontSize: 12,
-    color: AppDesign.textSecondary,
-    fontWeight: '600',
-  },
-  arrow: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+      ...AppDesign.cardShadow,
+    },
+    cardPressed: {
+      opacity: 0.94,
+      transform: [{ scale: 0.985 }],
+    },
+    gradientHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      padding: 20,
+    },
+    emoji: {
+      fontSize: 30,
+    },
+    headerText: {
+      flex: 1,
+      gap: 2,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: '#fff',
+    },
+    meta: {
+      fontSize: 13,
+      color: 'rgba(255,255,255,0.88)',
+      fontWeight: '600',
+    },
+    editButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    editPressed: {
+      opacity: 0.8,
+    },
+    editText: {
+      fontSize: 18,
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      backgroundColor: colors.backgroundSoft,
+    },
+    footerText: {
+      flex: 1,
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
+    arrow: {
+      fontSize: 22,
+      fontWeight: '800',
+    },
+  });
+}

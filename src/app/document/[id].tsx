@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
@@ -12,7 +12,7 @@ import { formatFormFieldDisplayValue } from '@/lib/pdf-form';
 import { getDocuments } from '@/lib/document-storage';
 import { exportDocumentPdf } from '@/lib/export-pdf';
 import { getTemplateById } from '@/lib/template-storage';
-import { Spacing } from '@/constants/theme';
+import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import type { Document } from '@/types/document';
@@ -31,15 +31,36 @@ function parseDocumentId(id: string | string[] | undefined): number | null {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   const colors = useTheme();
+  const rowStyles = useMemo(() => createDetailRowStyles(colors), [colors]);
 
   return (
-    <View style={[styles.detailRow, { backgroundColor: colors.backgroundElement }]}>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.detailLabel}>
+    <View style={rowStyles.detailRow}>
+      <ThemedText type="small" themeColor="textSecondary" style={rowStyles.detailLabel}>
         {label}
       </ThemedText>
-      <ThemedText style={styles.detailValue}>{value || '—'}</ThemedText>
+      <ThemedText style={rowStyles.detailValue}>{value || '—'}</ThemedText>
     </View>
   );
+}
+
+function createDetailRowStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    detailRow: {
+      borderRadius: AppDesign.radius.md,
+      padding: Spacing.three,
+      gap: Spacing.one,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundElement,
+    },
+    detailLabel: {
+      fontWeight: '700',
+    },
+    detailValue: {
+      fontSize: 16,
+      lineHeight: 24,
+    },
+  });
 }
 
 export default function DocumentDetailsScreen() {
@@ -48,6 +69,7 @@ export default function DocumentDetailsScreen() {
   const documentId = parseDocumentId(id);
   const insets = useSafeAreaInsets();
   const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [document, setDocument] = useState<Document | null>(null);
   const [template, setTemplate] = useState<DocumentTemplate | null>(null);
@@ -214,85 +236,72 @@ export default function DocumentDetailsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: AppDesign.background,
-  },
-  content: {
-    padding: Spacing.four,
-    gap: Spacing.four,
-  },
-  typeHero: {
-    borderRadius: AppDesign.radius.lg,
-    padding: 22,
-    gap: 6,
-    ...AppDesign.shadow,
-  },
-  typeHeroEmoji: {
-    fontSize: 30,
-    color: '#fff',
-  },
-  typeHeroTitle: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    lineHeight: 32,
-  },
-  typeHeroSubtitle: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  typeHeroDate: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  details: {
-    gap: Spacing.two,
-  },
-  detailRow: {
-    borderRadius: AppDesign.radius.md,
-    padding: Spacing.three,
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderColor: AppDesign.border,
-  },
-  detailLabel: {
-    fontWeight: '700',
-  },
-  detailValue: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  editButton: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-    marginRight: Spacing.one,
-  },
-  editButtonPressed: {
-    opacity: 0.6,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.four,
-  },
-  pdfButton: {
-    borderRadius: AppDesign.radius.md,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-    ...AppDesign.shadow,
-  },
-  pdfButtonPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.985 }],
-  },
-  pdfButtonText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-});
+function createStyles(_colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+    },
+    content: {
+      padding: Spacing.four,
+      gap: Spacing.four,
+    },
+    typeHero: {
+      borderRadius: AppDesign.radius.lg,
+      padding: 22,
+      gap: 6,
+      ...AppDesign.shadow,
+    },
+    typeHeroEmoji: {
+      fontSize: 30,
+      color: '#fff',
+    },
+    typeHeroTitle: {
+      color: '#fff',
+      fontSize: 26,
+      fontWeight: '800',
+      lineHeight: 32,
+    },
+    typeHeroSubtitle: {
+      color: 'rgba(255,255,255,0.92)',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    typeHeroDate: {
+      color: 'rgba(255,255,255,0.78)',
+      fontSize: 13,
+      marginTop: 4,
+    },
+    details: {
+      gap: Spacing.two,
+    },
+    editButton: {
+      paddingHorizontal: Spacing.two,
+      paddingVertical: Spacing.one,
+      marginRight: Spacing.one,
+    },
+    editButtonPressed: {
+      opacity: 0.6,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: Spacing.four,
+    },
+    pdfButton: {
+      borderRadius: AppDesign.radius.md,
+      paddingVertical: Spacing.three,
+      alignItems: 'center',
+      ...AppDesign.shadow,
+    },
+    pdfButtonPressed: {
+      opacity: 0.8,
+      transform: [{ scale: 0.985 }],
+    },
+    pdfButtonText: {
+      color: '#fff',
+      fontWeight: '800',
+      fontSize: 16,
+    },
+  });
+}

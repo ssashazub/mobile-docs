@@ -15,8 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
+import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useTheme } from '@/hooks/use-theme';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
@@ -27,6 +30,8 @@ import type { DocumentTemplate, PdfStyle } from '@/types/template';
 
 export default function CreateDocumentFormScreen() {
   const { t } = useI18n();
+  const colors = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { templateId } = useLocalSearchParams<{ templateId: string }>();
   const insets = useSafeAreaInsets();
 
@@ -104,29 +109,30 @@ export default function CreateDocumentFormScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <ThemedView style={styles.centered}>
         <Text style={styles.centeredText}>{t('create.loadingTemplate')}</Text>
-      </View>
+      </ThemedView>
     );
   }
 
   if (!template) {
     return (
-      <View style={styles.centered}>
+      <ThemedView style={styles.centered}>
         <Text style={styles.centeredText}>{t('create.templateNotFound')}</Text>
         <PrimaryButton label={t('common.back')} variant="secondary" onPress={() => router.back()} />
-      </View>
+      </ThemedView>
     );
   }
 
   return (
     <>
       <Stack.Screen options={{ title: template.title }} />
-      <KeyboardAvoidingView
-        style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-      >
+      <ThemedView style={styles.screen}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+        >
         <ScrollView
           contentContainerStyle={[
             styles.content,
@@ -189,81 +195,85 @@ export default function CreateDocumentFormScreen() {
             />
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </ThemedView>
     </>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: AppDesign.background,
-  },
-  content: {
-    padding: 24,
-    gap: 16,
-  },
-  hero: {
-    borderRadius: AppDesign.radius.lg,
-    padding: 22,
-    gap: 4,
-  },
-  heroKicker: {
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-  },
-  heroEmoji: {
-    fontSize: 30,
-    marginTop: 4,
-  },
-  heroTitle: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  noteCard: {
-    backgroundColor: '#eef2ff',
-    borderRadius: AppDesign.radius.md,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#c7d2fe',
-    gap: 4,
-  },
-  noteTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#4338ca',
-  },
-  noteText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#4f46e5',
-  },
-  form: {
-    gap: 14,
-  },
-  multiline: {
-    minHeight: 120,
-    paddingTop: 12,
-  },
-  actions: {
-    gap: 10,
-    marginTop: 8,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-    backgroundColor: AppDesign.background,
-  },
-  centeredText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: AppDesign.text,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+    },
+    flex: {
+      flex: 1,
+    },
+    content: {
+      padding: 24,
+      gap: 16,
+    },
+    hero: {
+      borderRadius: AppDesign.radius.lg,
+      padding: 22,
+      gap: 4,
+    },
+    heroKicker: {
+      color: 'rgba(255,255,255,0.82)',
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1.1,
+      textTransform: 'uppercase',
+    },
+    heroEmoji: {
+      fontSize: 30,
+      marginTop: 4,
+    },
+    heroTitle: {
+      color: '#fff',
+      fontSize: 26,
+      fontWeight: '800',
+    },
+    noteCard: {
+      backgroundColor: colors.noteBackground,
+      borderRadius: AppDesign.radius.md,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.noteBorder,
+      gap: 4,
+    },
+    noteTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: colors.noteTitle,
+    },
+    noteText: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.noteText,
+    },
+    form: {
+      gap: 14,
+    },
+    multiline: {
+      minHeight: 120,
+      paddingTop: 12,
+    },
+    actions: {
+      gap: 10,
+      marginTop: 8,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      gap: 12,
+    },
+    centeredText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+  });
+}
