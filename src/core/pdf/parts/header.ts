@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/core/pdf/html';
+import { resolveIconPdfText, normalizeTemplateIcon } from '@/lib/template-icon';
 import type { DocumentTemplate } from '@/types/template';
 import type { PdfHeaderStyle, ResolvedPdfDesign } from '@/types/pdf-style-design';
 
@@ -9,7 +10,8 @@ export function renderPdfHeader(
   created: string,
   showDate: boolean
 ): string {
-  const emojiPart = design.showEmoji ? `${escapeHtml(template.emoji)} ` : '';
+  const iconText = resolveIconPdfText(normalizeTemplateIcon(template));
+  const emojiPart = design.showEmoji && iconText ? `${escapeHtml(iconText)} ` : '';
   const dateBadge = showDate ? `<span class="badge">${created}</span>` : '';
   const metaWithDate = showDate
     ? `${emojiPart}${escapeHtml(template.title)} · ${created}`
@@ -21,7 +23,7 @@ export function renderPdfHeader(
         <div class="hero-kicker">${escapeHtml(template.title)}</div>
         <h1 class="hero-title">${escapeHtml(titleValue)}</h1>
         <div class="hero-meta">
-          ${design.showEmoji ? `<span class="badge">${escapeHtml(template.emoji)} ${escapeHtml(template.title)}</span>` : ''}
+          ${design.showEmoji && iconText ? `<span class="badge">${escapeHtml(iconText)} ${escapeHtml(template.title)}</span>` : ''}
           ${dateBadge}
         </div>
       </div>

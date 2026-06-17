@@ -3,7 +3,7 @@ import type { BuiltinTemplateDefinition } from '@/core/templates/types';
 
 export const invoiceDefinition: BuiltinTemplateDefinition = {
   id: 'invoice',
-  emoji: '🧾',
+  icon: { kind: 'symbol', value: 'receipt' },
   accentColor: '#047857',
   gradientEnd: '#10b981',
   locales: {

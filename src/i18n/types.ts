@@ -108,6 +108,12 @@ export type TranslationSchema = {
     fieldKindEmail: string;
     fieldKindPhone: string;
     saveTemplate: string;
+    iconTitle: string;
+    iconSubtitle: string;
+    iconPreset: string;
+    iconCustom: string;
+    iconNone: string;
+    iconCustomPlaceholder: string;
     editHeading: string;
     templateFieldsTitle: string;
     fieldsCount: string;

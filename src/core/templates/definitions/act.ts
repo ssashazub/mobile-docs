@@ -3,7 +3,7 @@ import type { BuiltinTemplateDefinition } from '@/core/templates/types';
 
 export const actDefinition: BuiltinTemplateDefinition = {
   id: 'act',
-  emoji: '✅',
+  icon: { kind: 'symbol', value: 'checkmark.seal' },
   accentColor: '#c2410c',
   gradientEnd: '#f97316',
   locales: {

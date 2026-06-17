@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { TemplateFieldEditor } from '@/components/template-field-editor';
+import { TemplateIconPicker } from '@/components/template-icon-picker';
+import { TemplateIconView } from '@/components/template-icon-view';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { DEFAULT_PDF_STYLE } from '@/constants/pdf-layouts';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
@@ -28,7 +30,10 @@ import {
   createEmptyField,
   getColorPresetIndex,
   normalizePdfStyle,
+  normalizeTemplate,
 } from '@/lib/template-helpers';
+import { normalizeTemplateIcon } from '@/lib/template-icon';
+import type { TemplateIcon } from '@/constants/template-icons';
 import { getNextCustomTemplateId, getTemplates, saveTemplate } from '@/lib/template-storage';
 import type { DocumentTemplate, PdfStyle, TemplateField } from '@/types/template';
 
@@ -44,7 +49,7 @@ export default function CreateTemplateScreen() {
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [baseTemplateId, setBaseTemplateId] = useState<BaseTemplateId>('blank');
   const [title, setTitle] = useState(blank.title);
-  const [emoji, setEmoji] = useState(blank.emoji);
+  const [icon, setIcon] = useState<TemplateIcon>(blank.icon);
   const [colorIndex, setColorIndex] = useState(4);
   const [fields, setFields] = useState<TemplateField[]>(blank.fields);
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>({ ...DEFAULT_PDF_STYLE });
@@ -68,7 +73,7 @@ export default function CreateTemplateScreen() {
     if (nextBaseId === 'blank') {
       const nextBlank = createBlankTemplate();
       setTitle(nextBlank.title);
-      setEmoji(nextBlank.emoji);
+      setIcon(nextBlank.icon);
       setFields(nextBlank.fields);
       setPdfStyle({ ...DEFAULT_PDF_STYLE });
       setColorIndex(4);
@@ -82,7 +87,7 @@ export default function CreateTemplateScreen() {
     }
 
     setTitle(t('templates.newTemplate'));
-    setEmoji(base.emoji);
+    setIcon(normalizeTemplateIcon(base));
     setFields(cloneTemplateFields(base.fields));
     setPdfStyle(normalizePdfStyle(base.pdfStyle, base.id));
     setColorIndex(getColorPresetIndex(base.accentColor));
@@ -119,10 +124,10 @@ export default function CreateTemplateScreen() {
 
     try {
       const now = new Date().toISOString();
-      const template: DocumentTemplate = {
+      const template = normalizeTemplate({
         id: getNextCustomTemplateId(),
         title: title.trim(),
-        emoji: emoji.trim() || '📝',
+        icon,
         accentColor: colorPreset.accentColor,
         gradientEnd: colorPreset.gradientEnd,
         fields,
@@ -130,7 +135,7 @@ export default function CreateTemplateScreen() {
         isBuiltIn: false,
         createdAt: now,
         updatedAt: now,
-      };
+      });
 
       await saveTemplate(template);
       router.replace(`/templates/edit/${template.id}` as Href);
@@ -167,7 +172,11 @@ export default function CreateTemplateScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.baseEmoji}>✨</Text>
+                <TemplateIconView
+                  icon={{ kind: 'symbol', value: 'sparkles' }}
+                  size={24}
+                  color={baseTemplateId === 'blank' ? colors.primary : colors.textSecondary}
+                />
                 <Text
                   style={[
                     styles.baseCardTitle,
@@ -192,7 +201,7 @@ export default function CreateTemplateScreen() {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.baseEmoji}>{template.emoji}</Text>
+                    <TemplateIconView icon={normalizeTemplateIcon(template)} size={24} color={colors.textSecondary} />
                     <Text
                       style={[
                         styles.baseCardTitle,
@@ -229,15 +238,7 @@ export default function CreateTemplateScreen() {
               placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={styles.label}>{t('common.emoji')}</Text>
-            <TextInput
-              style={styles.input}
-              value={emoji}
-              onChangeText={setEmoji}
-              placeholder="📝"
-              placeholderTextColor={colors.textMuted}
-              maxLength={4}
-            />
+            <TemplateIconPicker value={icon} onChange={setIcon} />
 
             <Text style={styles.label}>{t('common.color')}</Text>
             <View style={styles.colors}>
@@ -321,7 +322,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.backgroundSoft,
       borderColor: colors.primary,
     },
-    baseEmoji: { fontSize: 24 },
     baseCardTitle: {
       fontSize: 13,
       fontWeight: '800',

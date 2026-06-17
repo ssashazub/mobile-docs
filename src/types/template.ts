@@ -1,4 +1,7 @@
 import type { FieldInputKind } from '@/types/field-validation';
+import type { TemplateIcon } from '@/constants/template-icons';
+
+export type { TemplateIcon, TemplateIconKind, TemplateSymbolId } from '@/constants/template-icons';
 
 export type TemplateField = {
   key: string;
@@ -33,7 +36,9 @@ export type PdfStyle = {
 export type DocumentTemplate = {
   id: string;
   title: string;
-  emoji: string;
+  icon: TemplateIcon;
+  /** @deprecated Synced from `icon` for PDF export compatibility */
+  emoji?: string;
   accentColor: string;
   gradientEnd: string;
   fields: TemplateField[];

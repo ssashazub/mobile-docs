@@ -3,7 +3,7 @@ import type { BuiltinTemplateDefinition } from '@/core/templates/types';
 
 export const reportDefinition: BuiltinTemplateDefinition = {
   id: 'report',
-  emoji: '📊',
+  icon: { kind: 'symbol', value: 'chart.bar' },
   accentColor: '#6d28d9',
   gradientEnd: '#8b5cf6',
   locales: {

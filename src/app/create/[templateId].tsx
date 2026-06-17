@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TemplateIconView } from '@/components/template-icon-view';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -25,6 +26,7 @@ import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpe
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
 import { validateTemplateFields } from '@/lib/field-validation';
 import { normalizePdfStyle } from '@/lib/template-helpers';
+import { normalizeTemplateIcon } from '@/lib/template-icon';
 import { getTemplateById } from '@/lib/template-storage';
 import type { DocumentTemplate, PdfStyle } from '@/types/template';
 
@@ -147,7 +149,12 @@ export default function CreateDocumentFormScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.hero}
           >
-            <Text style={styles.heroEmoji}>{template.emoji}</Text>
+            <TemplateIconView
+              icon={normalizeTemplateIcon(template)}
+              size={30}
+              color="#ffffff"
+              textStyle={styles.heroEmoji}
+            />
             <Text style={styles.heroTitle}>{template.title}</Text>
           </LinearGradient>
 

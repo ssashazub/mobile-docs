@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { TemplateIconBadge } from '@/components/template-icon-view';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
@@ -47,9 +48,12 @@ export function DocumentCard({
       <View style={styles.content}>
         <View style={styles.topRow}>
           <View style={[styles.badge, { backgroundColor: `${display.accentColor}16` }]}>
-            <Text style={[styles.badgeText, { color: display.accentColor }]}>
-              {display.emoji} {display.title}
-            </Text>
+            <TemplateIconBadge
+              icon={display.icon}
+              title={display.title}
+              size={13}
+              color={display.accentColor}
+            />
           </View>
           <Text style={styles.date}>
             {new Date(document.createdAt).toLocaleDateString(dateLocale)}
@@ -103,10 +107,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 999,
       paddingHorizontal: 10,
       paddingVertical: 5,
-    },
-    badgeText: {
-      fontSize: 12,
-      fontWeight: '800',
+      maxWidth: '72%',
     },
     date: {
       fontSize: 12,

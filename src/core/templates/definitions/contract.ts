@@ -3,7 +3,7 @@ import type { BuiltinTemplateDefinition } from '@/core/templates/types';
 
 export const contractDefinition: BuiltinTemplateDefinition = {
   id: 'contract',
-  emoji: '📄',
+  icon: { kind: 'symbol', value: 'doc.text' },
   accentColor: '#1d4ed8',
   gradientEnd: '#3b82f6',
   locales: {

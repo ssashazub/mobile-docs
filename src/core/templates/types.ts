@@ -1,5 +1,6 @@
 import type { AppLocale } from '@/i18n/types';
 import type { FieldInputKind } from '@/types/field-validation';
+import type { TemplateIcon } from '@/constants/template-icons';
 
 export type LocalizedFieldText = {
   label: string;
@@ -16,7 +17,7 @@ export type TemplateFieldDefinition = {
 
 export type BuiltinTemplateDefinition = {
   id: string;
-  emoji: string;
+  icon: TemplateIcon;
   accentColor: string;
   gradientEnd: string;
   locales: Record<AppLocale, { title: string }>;

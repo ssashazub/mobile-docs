@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { TemplateIconView } from '@/components/template-icon-view';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { normalizeTemplateIcon } from '@/lib/template-icon';
 import type { DocumentTemplate } from '@/types/template';
 
 type DocumentTypeCardProps = {
@@ -30,7 +32,12 @@ export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCard
         end={{ x: 1, y: 1 }}
         style={styles.gradientHeader}
       >
-        <Text style={styles.emoji}>{template.emoji}</Text>
+        <TemplateIconView
+          icon={normalizeTemplateIcon(template)}
+          size={30}
+          color="#ffffff"
+          style={styles.heroIcon}
+        />
         <View style={styles.headerText}>
           <Text style={styles.title}>{template.title}</Text>
           <Text style={styles.meta}>
@@ -80,8 +87,11 @@ function createStyles(colors: ThemeColors) {
       gap: 14,
       padding: 20,
     },
-    emoji: {
-      fontSize: 30,
+    heroIcon: {
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     headerText: {
       flex: 1,

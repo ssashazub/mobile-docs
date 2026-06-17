@@ -1,4 +1,6 @@
+import { DEFAULT_TEMPLATE_ICON } from '@/constants/template-icons';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
+import { normalizeTemplateIcon, resolveIconPdfText } from '@/lib/template-icon';
 import { BUILTIN_PDF_STYLES, DEFAULT_PDF_STYLE } from '@/constants/pdf-layouts';
 import { getTranslations } from '@/i18n';
 import { getAppLocale } from '@/i18n';
@@ -21,8 +23,12 @@ export function normalizePdfStyle(
 }
 
 export function normalizeTemplate(template: DocumentTemplate): DocumentTemplate {
+  const icon = normalizeTemplateIcon(template);
+
   return {
     ...template,
+    icon,
+    emoji: resolveIconPdfText(icon),
     pdfStyle: normalizePdfStyle(template.pdfStyle, template.id),
     fields: template.fields.map((field) => ({ ...field })),
   };
@@ -96,7 +102,7 @@ export function createBlankTemplate() {
 
   return {
     title: strings.templates.newTemplate,
-    emoji: '📝',
+    icon: DEFAULT_TEMPLATE_ICON,
     accentColor: '#4f46e5',
     gradientEnd: '#6366f1',
     pdfStyle: { ...DEFAULT_PDF_STYLE },

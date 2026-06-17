@@ -15,13 +15,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { TemplateFieldEditor } from '@/components/template-field-editor';
+import { TemplateIconPicker } from '@/components/template-icon-picker';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
-import { createEmptyField, normalizePdfStyle } from '@/lib/template-helpers';
+import { createEmptyField, normalizePdfStyle, normalizeTemplate } from '@/lib/template-helpers';
+import { normalizeTemplateIcon } from '@/lib/template-icon';
+import type { TemplateIcon } from '@/constants/template-icons';
 import { getTemplateById, resetTemplateToDefault, saveTemplate } from '@/lib/template-storage';
 import type { DocumentTemplate, PdfStyle, TemplateField } from '@/types/template';
 
@@ -34,7 +37,7 @@ export default function EditTemplateScreen() {
 
   const [template, setTemplate] = useState<DocumentTemplate | null>(null);
   const [title, setTitle] = useState('');
-  const [emoji, setEmoji] = useState('📝');
+  const [icon, setIcon] = useState<TemplateIcon>({ kind: 'symbol', value: 'doc.plaintext' });
   const [colorIndex, setColorIndex] = useState(0);
   const [fields, setFields] = useState<TemplateField[]>([]);
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>(normalizePdfStyle(undefined));
@@ -60,7 +63,7 @@ export default function EditTemplateScreen() {
 
     setTemplate(loaded);
     setTitle(loaded.title);
-    setEmoji(loaded.emoji);
+    setIcon(normalizeTemplateIcon(loaded));
     setFields(loaded.fields);
     setPdfStyle(normalizePdfStyle(loaded.pdfStyle, loaded.id));
 
@@ -107,15 +110,17 @@ export default function EditTemplateScreen() {
     setSaving(true);
 
     try {
-      await saveTemplate({
-        ...template,
-        title: title.trim(),
-        emoji: emoji.trim() || '📝',
-        accentColor: colorPreset.accentColor,
-        gradientEnd: colorPreset.gradientEnd,
-        fields,
-        pdfStyle,
-      });
+      await saveTemplate(
+        normalizeTemplate({
+          ...template,
+          title: title.trim(),
+          icon,
+          accentColor: colorPreset.accentColor,
+          gradientEnd: colorPreset.gradientEnd,
+          fields,
+          pdfStyle,
+        })
+      );
       router.back();
     } finally {
       setSaving(false);
@@ -183,15 +188,7 @@ export default function EditTemplateScreen() {
               placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={styles.label}>{t('common.emoji')}</Text>
-            <TextInput
-              style={styles.input}
-              value={emoji}
-              onChangeText={setEmoji}
-              placeholder="📝"
-              placeholderTextColor={colors.textMuted}
-              maxLength={4}
-            />
+            <TemplateIconPicker value={icon} onChange={setIcon} />
 
             <Text style={styles.label}>{t('common.color')}</Text>
             <View style={styles.colors}>

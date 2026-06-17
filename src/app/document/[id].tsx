@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TemplateIconView } from '@/components/template-icon-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
@@ -191,7 +192,12 @@ export default function DocumentDetailsScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.typeHero}
           >
-            <ThemedText style={styles.typeHeroEmoji}>{display.emoji}</ThemedText>
+            <TemplateIconView
+              icon={display.icon}
+              size={30}
+              color="#ffffff"
+              textStyle={styles.typeHeroEmoji}
+            />
             <ThemedText style={styles.typeHeroTitle}>{document.title}</ThemedText>
             <ThemedText style={styles.typeHeroSubtitle}>{display.title}</ThemedText>
             <ThemedText style={styles.typeHeroDate}>

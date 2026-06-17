@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TemplateIconBadge } from '@/components/template-icon-view';
 import { PdfFormFieldInput } from '@/components/pdf-form-field';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
@@ -240,9 +241,13 @@ export default function EditDocumentScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.typeBanner}
             >
-              <ThemedText style={styles.typeBannerText}>
-                {display.emoji} {display.title}
-              </ThemedText>
+              <TemplateIconBadge
+                icon={display.icon}
+                title={display.title}
+                size={15}
+                color="#ffffff"
+                titleStyle={styles.typeBannerText}
+              />
             </LinearGradient>
 
             <ThemedText themeColor="textSecondary" style={styles.hint}>

@@ -1,4 +1,6 @@
 import { IMPORTED_FORM_DISPLAY, IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
+import { DEFAULT_TEMPLATE_ICON, type TemplateIcon } from '@/constants/template-icons';
+import { normalizeTemplateIcon } from '@/lib/template-icon';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate, TemplateField } from '@/types/template';
 
@@ -10,7 +12,7 @@ export function getDocumentDisplayInfo(
   document: Document,
   template: DocumentTemplate | null | undefined
 ): {
-  emoji: string;
+  icon: TemplateIcon;
   title: string;
   accentColor: string;
   gradientEnd: string;
@@ -18,7 +20,7 @@ export function getDocumentDisplayInfo(
 } {
   if (isImportedFormDocument(document) && document.formFields) {
     return {
-      emoji: IMPORTED_FORM_DISPLAY.emoji,
+      icon: IMPORTED_FORM_DISPLAY.icon,
       title: IMPORTED_FORM_DISPLAY.title,
       accentColor: IMPORTED_FORM_DISPLAY.accentColor,
       gradientEnd: IMPORTED_FORM_DISPLAY.gradientEnd,
@@ -32,7 +34,7 @@ export function getDocumentDisplayInfo(
 
   if (!template) {
     return {
-      emoji: '📄',
+      icon: DEFAULT_TEMPLATE_ICON,
       title: document.templateId,
       accentColor: '#4f46e5',
       gradientEnd: '#6366f1',
@@ -43,8 +45,10 @@ export function getDocumentDisplayInfo(
     };
   }
 
+  const icon = normalizeTemplateIcon(template);
+
   return {
-    emoji: template.emoji,
+    icon,
     title: template.title,
     accentColor: template.accentColor,
     gradientEnd: template.gradientEnd,

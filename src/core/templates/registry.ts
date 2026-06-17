@@ -1,7 +1,7 @@
 import { BUILTIN_PDF_STYLES, DEFAULT_PDF_STYLE } from '@/constants/pdf-layouts';
 import type { AppLocale } from '@/i18n/types';
 import { getAppLocale } from '@/i18n';
-import { normalizePdfStyle } from '@/lib/template-helpers';
+import { normalizeTemplate, normalizePdfStyle } from '@/lib/template-helpers';
 import type { DocumentTemplate } from '@/types/template';
 import { resolveTemplateFields } from '@/core/templates/field-def';
 import type { BuiltinTemplateDefinition } from '@/core/templates/types';
@@ -14,10 +14,10 @@ export function buildBuiltinTemplate(
   const now = new Date().toISOString();
   const localized = definition.locales[locale] ?? definition.locales.en;
 
-  return {
+  return normalizeTemplate({
     id: definition.id,
     title: localized.title,
-    emoji: definition.emoji,
+    icon: definition.icon,
     accentColor: definition.accentColor,
     gradientEnd: definition.gradientEnd,
     pdfStyle: normalizePdfStyle(BUILTIN_PDF_STYLES[definition.id] ?? DEFAULT_PDF_STYLE, definition.id),
@@ -25,7 +25,7 @@ export function buildBuiltinTemplate(
     createdAt: now,
     updatedAt: now,
     fields: resolveTemplateFields(definition.fields, locale),
-  };
+  });
 }
 
 export function getBuiltinTemplates(locale: AppLocale = getAppLocale()): DocumentTemplate[] {
