@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SymbolView } from 'expo-symbols';
 
 import { TemplateIconView } from '@/components/template-icon-view';
 import { AppDesign } from '@/constants/app-design';
@@ -50,9 +51,16 @@ export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCard
               event.stopPropagation();
               onEdit();
             }}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.edit')}
             style={({ pressed }) => [styles.editButton, pressed && styles.editPressed]}
           >
-            <Text style={styles.editText}>✏️</Text>
+            <SymbolView
+              name={{ ios: 'pencil', android: 'edit', web: 'edit' }}
+              size={18}
+              tintColor="#ffffff"
+              weight="semibold"
+            />
           </Pressable>
         ) : null}
       </LinearGradient>
@@ -61,7 +69,12 @@ export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCard
         <Text style={styles.footerText} numberOfLines={1}>
           {template.fields.map((field) => field.label).join(' · ')}
         </Text>
-        <Text style={[styles.arrow, { color: template.accentColor }]}>→</Text>
+        <SymbolView
+          name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+          size={18}
+          tintColor={template.accentColor}
+          weight="semibold"
+        />
       </View>
     </Pressable>
   );
@@ -118,9 +131,6 @@ function createStyles(colors: ThemeColors) {
     editPressed: {
       opacity: 0.8,
     },
-    editText: {
-      fontSize: 18,
-    },
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -135,10 +145,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       color: colors.textSecondary,
       fontWeight: '600',
-    },
-    arrow: {
-      fontSize: 22,
-      fontWeight: '800',
     },
   });
 }

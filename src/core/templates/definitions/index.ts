@@ -6,7 +6,7 @@ import type { BuiltinTemplateDefinition } from '@/core/templates/types';
 
 /**
  * Реестр встроенных шаблонов.
- * Чтобы добавить новый — создайте файл в definitions/ и подключите сюда.
+ * Чтобы добавить новый - создайте файл в definitions/ и подключите сюда.
  */
 export const BUILTIN_TEMPLATE_DEFINITIONS: BuiltinTemplateDefinition[] = [
   contractDefinition,

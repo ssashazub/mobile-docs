@@ -35,14 +35,13 @@ export function renderPdfFields(
       const rows = fields
         .map((field) => {
           const value = formatFieldValue(document.fields[field.key], field.multiline);
-          const rowClass = field.multiline ? 'wide' : '';
 
           if (field.multiline) {
             return `
-              <tr class="${rowClass}">
+              <tr>
                 <td class="label" colspan="2">${escapeHtml(field.label)}</td>
               </tr>
-              <tr class="${rowClass}">
+              <tr>
                 <td class="value" colspan="2">${value}</td>
               </tr>
             `;
@@ -57,35 +56,71 @@ export function renderPdfFields(
         })
         .join('');
 
-      return `<table class="fields-table">${rows}</table>`;
+      return `<table class="fields-table" width="100%">${rows}</table>`;
     },
-    cards: () => renderGridFields(design, fields, document, 'card'),
-    columns: () => renderGridFields(design, fields, document, 'column'),
+    cards: () => renderGridFields(fields, document, 'card'),
+    columns: () => renderGridFields(fields, document, 'column'),
   };
 
   return renderers[design.fieldsStyle]();
 }
 
+/**
+ * Use HTML tables instead of CSS grid - Android WebView print often
+ * ignores grid and leaves content left-aligned / narrow on A4.
+ */
 function renderGridFields(
-  _design: ResolvedPdfDesign,
   fields: TemplateField[],
   document: Document,
-  mode: 'card' | 'column' | 'grid'
+  mode: 'card' | 'column'
 ): string {
-  const itemClass = mode === 'card' ? 'card-item' : mode === 'column' ? 'column-item' : 'grid-item';
-  const labelClass = mode === 'card' ? 'card-label' : mode === 'column' ? 'column-label' : 'grid-label';
-  const valueClass = mode === 'card' ? 'card-value' : mode === 'column' ? 'column-value' : 'grid-value';
+  const itemClass = mode === 'card' ? 'card-item' : 'column-item';
+  const labelClass = mode === 'card' ? 'card-label' : 'column-label';
+  const valueClass = mode === 'card' ? 'card-value' : 'column-value';
 
-  const items = fields
-    .map(
-      (field) => `
-        <div class="${itemClass}${field.multiline ? ' wide' : ''}">
-          <div class="${labelClass}">${escapeHtml(field.label)}</div>
-          <div class="${valueClass}">${formatFieldValue(document.fields[field.key], field.multiline)}</div>
-        </div>
-      `
-    )
-    .join('');
+  const cell = (field: TemplateField) => `
+    <td class="${itemClass}" width="50%" valign="top">
+      <div class="${labelClass}">${escapeHtml(field.label)}</div>
+      <div class="${valueClass}">${formatFieldValue(document.fields[field.key], field.multiline)}</div>
+    </td>
+  `;
 
-  return `<div class="grid">${items}</div>`;
+  const rows: string[] = [];
+  let index = 0;
+
+  while (index < fields.length) {
+    const current = fields[index]!;
+
+    if (current.multiline) {
+      rows.push(`
+        <tr>
+          <td class="${itemClass}" colspan="2" width="100%" valign="top">
+            <div class="${labelClass}">${escapeHtml(current.label)}</div>
+            <div class="${valueClass}">${formatFieldValue(document.fields[current.key], true)}</div>
+          </td>
+        </tr>
+      `);
+      index += 1;
+      continue;
+    }
+
+    const next = fields[index + 1];
+    if (next && !next.multiline) {
+      rows.push(`<tr>${cell(current)}${cell(next)}</tr>`);
+      index += 2;
+      continue;
+    }
+
+    rows.push(`
+      <tr>
+        <td class="${itemClass}" colspan="2" width="100%" valign="top">
+          <div class="${labelClass}">${escapeHtml(current.label)}</div>
+          <div class="${valueClass}">${formatFieldValue(document.fields[current.key], false)}</div>
+        </td>
+      </tr>
+    `);
+    index += 1;
+  }
+
+  return `<table class="fields-grid" width="100%" cellspacing="0" cellpadding="0">${rows.join('')}</table>`;
 }

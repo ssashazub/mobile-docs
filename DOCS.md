@@ -1,4 +1,4 @@
-# Mobile Docs — документация проекта
+# Mobile Docs - документация проекта
 
 Краткий путеводитель: где что лежит, за что отвечает и куда лезть при правках.  
 Описаны только **прикладные** файлы приложения (без системных/шаблонных файлов Expo).
@@ -7,11 +7,11 @@
 
 ## Что делает приложение
 
-1. **Документы** — создаёшь по шаблону, заполняешь поля, смотришь, редактируешь, экспортируешь PDF.
-2. **Шаблоны** — встроенные (Договор, Рахунок, Звіт, Акт) + свои кастомные. Настраиваются поля, цвет, вид PDF.
-3. **Локализация** — украинский, русский, английский (по языку системы).
-4. **Импорт PDF** — свои документы и сторонние PDF-формы.
-5. **Хранение** — всё локально в AsyncStorage на устройстве.
+1. **Документы** - создаёшь по шаблону, заполняешь поля, смотришь, редактируешь, экспортируешь PDF.
+2. **Шаблоны** - встроенные (Договор, Рахунок, Звіт, Акт) + свои кастомные. Настраиваются поля, цвет, вид PDF.
+3. **Локализация** - украинский, русский, английский (по языку системы).
+4. **Импорт PDF** - свои документы и сторонние PDF-формы.
+5. **Хранение** - всё локально в AsyncStorage на устройстве.
 
 ---
 
@@ -37,7 +37,7 @@
 
 ```
 src/
-├── app/                  # Экраны (Expo Router — файл = маршрут)
+├── app/                  # Экраны (Expo Router - файл = маршрут)
 ├── core/                 # ★ Ядро: шаблоны и PDF (без UI)
 ├── components/           # UI-компоненты
 ├── constants/            # Константы, дефолты, дизайн
@@ -49,7 +49,7 @@ src/
 
 ---
 
-## Ядро (`src/core/`) — главное для разработки шаблонов
+## Ядро (`src/core/`) - главное для разработки шаблонов
 
 Ядро отделено от экранов и AsyncStorage. Здесь описываются **встроенные шаблоны** и **сборка PDF**.  
 Экраны и `lib/*` только вызывают API ядра.
@@ -62,7 +62,7 @@ src/core/
 │   ├── field-def.ts            # defineField(), resolveTemplateFields(), CommonFieldKeys
 │   ├── registry.ts             # buildBuiltinTemplate(), getBuiltinTemplates()
 │   ├── definitions/
-│   │   ├── index.ts            # BUILTIN_TEMPLATE_DEFINITIONS — реестр
+│   │   ├── index.ts            # BUILTIN_TEMPLATE_DEFINITIONS - реестр
 │   │   ├── contract.ts         # Один файл = один встроенный шаблон
 │   │   ├── invoice.ts
 │   │   ├── report.ts
@@ -71,10 +71,10 @@ src/core/
 └── pdf/
     ├── html.ts                 # escapeHtml, formatFieldValue, wrapPdfPage
     ├── styles.ts               # buildPdfStyles(design)
-    ├── render.ts               # renderDocumentPdfHtml() — оркестратор
+    ├── render.ts               # renderDocumentPdfHtml() - оркестратор
     ├── parts/
     │   ├── header.ts           # renderPdfHeader()
-    │   ├── fields.ts           # renderPdfFields() — sections/list/table/cards/columns
+    │   ├── fields.ts           # renderPdfFields() - sections/list/table/cards/columns
     │   └── footer.ts           # renderPdfFooter()
     └── index.ts
 ```
@@ -187,9 +187,9 @@ npx tsc --noEmit
 | `locales` | Подписи и placeholder для `uk`, `ru`, `en` |
 | `required` | Обязательное при создании документа |
 | `multiline` | Многострочный ввод |
-| `kind` | `text` \| `date` \| `number` \| `email` \| `phone` — валидация |
+| `kind` | `text` \| `date` \| `number` \| `email` \| `phone` - валидация |
 
-Константа `CommonFieldKeys` в `field-def.ts` — список типичных ключей для единообразия.
+Константа `CommonFieldKeys` в `field-def.ts` - список типичных ключей для единообразия.
 
 ---
 
@@ -246,45 +246,45 @@ export-pdf.ts → expo-print → PDF
 
 ---
 
-## Экраны — `src/app/`
+## Экраны - `src/app/`
 
-### `index.tsx` — главная
+### `index.tsx` - главная
 - Загружает документы и шаблоны при каждом фокусе экрана.
 - Показывает карточки документов (`DocumentCard`).
 - Долгое нажатие на документ → меню (открыть / редактировать / удалить) через `ActionSheet`.
 - **Править:** текст кнопок, пустое состояние, внешний вид списка.
 
-### `create/index.tsx` — выбор шаблона (шаг 1)
+### `create/index.tsx` - выбор шаблона (шаг 1)
 - Список шаблонов (`DocumentTypeCard`).
 - Кнопка «Керувати шаблонами» → `/templates`.
 - **Править:** заголовки, подписи, список шаблонов.
 
-### `create/[templateId].tsx` — форма нового документа (шаг 2)
+### `create/[templateId].tsx` - форма нового документа (шаг 2)
 - Загружает шаблон по `templateId`.
 - Поля формы (`FormField`) из шаблона.
-- Выбор вида PDF (`PdfLayoutPicker`) — сохраняется в документ.
+- Выбор вида PDF (`PdfLayoutPicker`) - сохраняется в документ.
 - Сохраняет документ через `addDocument()`.
 - **Править:** логику создания, валидацию обязательных полей, расположение блоков.
 
-### `document/[id].tsx` — просмотр документа
+### `document/[id].tsx` - просмотр документа
 - Показывает все поля документа.
 - Кнопка «Экспорт PDF» → `exportDocumentPdf()`.
 - Кнопка Edit в шапке → редактирование.
 - **Править:** внешний вид карточки, кнопку экспорта.
 
-### `document/edit/[id].tsx` — редактирование документа
+### `document/edit/[id].tsx` - редактирование документа
 - Загружает документ + шаблон.
 - Редактируемые поля + вид PDF.
 - Сохраняет через `updateDocument()`.
 - **Править:** валидацию, поля, сохранение.
 
-### `templates/index.tsx` — список шаблонов
+### `templates/index.tsx` - список шаблонов
 - Все шаблоны (встроенные + кастомные).
 - Кнопка «+ Создать шаблон».
 - Удаление только кастомных шаблонов.
 - **Править:** список, кнопку создания, удаление.
 
-### `templates/create.tsx` — создание шаблона
+### `templates/create.tsx` - создание шаблона
 - Выбор основы (пустой / существующий шаблон).
 - Название, эмодзі, цвет.
 - Вид PDF (`PdfLayoutPicker`).
@@ -292,18 +292,18 @@ export-pdf.ts → expo-print → PDF
 - Сохраняет через `saveTemplate()`.
 - **Править:** дефолтные поля при создании, форму, валидацию.
 
-### `templates/edit/[id].tsx` — редактирование шаблона
+### `templates/edit/[id].tsx` - редактирование шаблона
 - То же, что create, но для существующего шаблона.
-- Для встроенных шаблонов — кнопка «Скинути до стандарту» (`resetTemplateToDefault`).
+- Для встроенных шаблонов - кнопка «Скинути до стандарту» (`resetTemplateToDefault`).
 - **Править:** поля шаблона, PDF-стиль, сброс встроенных.
 
-### `_layout.tsx` — корневой layout
+### `_layout.tsx` - корневой layout
 - Stack-навигация, цвет шапки, заголовки основных экранов.
 - **Править:** глобальные заголовки, стиль header.
 
 ---
 
-## Компоненты — `src/components/`
+## Компоненты - `src/components/`
 
 ### Прикладные (наши)
 
@@ -317,7 +317,7 @@ export-pdf.ts → expo-print → PDF
 | `pdf-form-field.tsx` | Поле импортированной PDF-формы (checkbox, radio…) | Импорт PDF |
 | `template-field-editor.tsx` | Редактор одного поля шаблона | Поля в редакторе шаблонов |
 
-### UI — `src/components/ui/`
+### UI - `src/components/ui/`
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
@@ -327,7 +327,7 @@ export-pdf.ts → expo-print → PDF
 
 ---
 
-## Логика — `src/lib/`
+## Логика - `src/lib/`
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
@@ -338,24 +338,24 @@ export-pdf.ts → expo-print → PDF
 | `field-validation.ts` | Валидация полей (дата, число, email…) | Правила ввода |
 | `document-helpers.ts` | Сборка документа из полей | Логика title/client/description |
 | `template-helpers.ts` | Пустой шаблон, нормализация PDF-стиля | Дефолты при создании шаблона |
-| `pdf-templates.ts` | Re-export → `core/pdf/render.ts` | Совместимость; правки — в `core/pdf/` |
+| `pdf-templates.ts` | Re-export → `core/pdf/render.ts` | Совместимость; правки - в `core/pdf/` |
 | `export-pdf.ts` | Генерация PDF + Share | Имя файла, ошибки экспорта |
 | `import-pdf.ts` | Импорт PDF (свой / сторонний) | Импорт форм |
 
 ---
 
-## Типы — `src/types/`
+## Типы - `src/types/`
 
 | Файл | Содержимое |
 |------|------------|
-| `document.ts` | `Document` — id, title, templateId, client, description, fields, pdfStyle?, createdAt |
+| `document.ts` | `Document` - id, title, templateId, client, description, fields, pdfStyle?, createdAt |
 | `template.ts` | `DocumentTemplate`, `TemplateField`, `PdfStyle`, `PdfLayout` |
 
 **Править**, если добавляешь новые поля в документ или шаблон (и потом обновить storage + экраны).
 
 ---
 
-## Константы — `src/constants/`
+## Константы - `src/constants/`
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
@@ -367,7 +367,7 @@ export-pdf.ts → expo-print → PDF
 
 ---
 
-## Переводы — `src/i18n/`
+## Переводы - `src/i18n/`
 
 | Файл | За что отвечает |
 |------|-----------------|
@@ -392,19 +392,19 @@ export-pdf.ts → expo-print → PDF
 ```
 AsyncStorage
 ├── documents          → Document[]
-├── document_templates → кастомные шаблоны (встроенные — из core)
+├── document_templates → кастомные шаблоны (встроенные - из core)
 └── pdf_styles         → сохранённые PDF-стили конструктора
 ```
 
-- Встроенные шаблоны **не хранятся** — собираются из `core/templates/definitions/` при каждом `getTemplates()`.
+- Встроенные шаблоны **не хранятся** - собираются из `core/templates/definitions/` при каждом `getTemplates()`.
 - Документы хранят `templateId` + `fields` + опционально свой `pdfStyle`.
 - Шаблоны хранят `fields`, `pdfStyle`, цвета, emoji.
 
-**Не сохранять данные через `useEffect` на главной** — только через `document-storage` / `template-storage`.
+**Не сохранять данные через `useEffect` на главной** - только через `document-storage` / `template-storage`.
 
 ---
 
-## PDF — как устроено
+## PDF - как устроено
 
 См. раздел **«PDF-ядро»** выше. Кратко:
 
@@ -415,7 +415,7 @@ AsyncStorage
 
 ---
 
-## Где что править — шпаргалка
+## Где что править - шпаргалка
 
 | Задача | Файлы |
 |--------|-------|
@@ -488,7 +488,7 @@ AsyncStorage
 - `src/global.css`, `*.module.css`
 - `scripts/`, `assets/`, `app.json`, `package.json`
 
-Основной дизайн приложения — **`constants/app-design.ts`**, не `theme.ts`.
+Основной дизайн приложения - **`constants/app-design.ts`**, не `theme.ts`.
 
 ---
 

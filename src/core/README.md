@@ -11,8 +11,8 @@ import { defineField, getBuiltinTemplates, renderDocumentPdfHtml } from '@/core'
 
 ## Добавить шаблон
 
-1. `templates/definitions/my-template.ts` — `BuiltinTemplateDefinition`
-2. `templates/definitions/index.ts` — добавить в массив
+1. `templates/definitions/my-template.ts` - `BuiltinTemplateDefinition`
+2. `templates/definitions/index.ts` - добавить в массив
 3. `npx tsc --noEmit`
 
 Подробно: [DOCS.md](../../DOCS.md#ядро-srccore--главное-для-разработки-шаблонов)

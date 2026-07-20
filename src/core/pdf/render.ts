@@ -24,5 +24,9 @@ export function renderDocumentPdfHtml(document: Document, template: DocumentTemp
     ? renderPdfFooter(t('pdf.footer'), created, pdfStyle.showDate)
     : '';
 
-  return wrapPdfPage(`${header}${fields}${footer}`, buildPdfStyles(design), getAppLocale());
+  return wrapPdfPage(
+    `<div class="page-main">${header}${fields}</div>${footer}`,
+    buildPdfStyles(design),
+    getAppLocale()
+  );
 }

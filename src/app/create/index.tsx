@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type Href, Stack, router, useFocusEffect } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DocumentTypeCard } from '@/components/document-type-card';
@@ -39,7 +40,15 @@ export default function CreateDocumentTypeScreen() {
             style={({ pressed }) => [styles.manageButton, pressed && styles.pressed]}
             onPress={() => router.push('/templates' as Href)}
           >
-            <Text style={styles.manageTitle}>⚙️ {t('create.manageTemplates')}</Text>
+            <View style={styles.manageTitleRow}>
+              <SymbolView
+                name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }}
+                size={18}
+                tintColor={colors.primary}
+                weight="semibold"
+              />
+              <Text style={styles.manageTitle}>{t('create.manageTemplates')}</Text>
+            </View>
             <Text style={styles.manageSubtitle}>{t('create.manageSubtitle')}</Text>
           </Pressable>
 
@@ -69,22 +78,15 @@ function createStyles(colors: ThemeColors) {
       padding: 24,
       gap: 14,
     },
-    kicker: {
-      fontSize: 12,
-      fontWeight: '800',
-      letterSpacing: 1.2,
-      textTransform: 'uppercase',
-      color: colors.hint,
-    },
     heading: {
       fontSize: 30,
       fontWeight: '800',
       color: colors.text,
     },
     subheading: {
-      fontSize: 15,
-      lineHeight: 22,
-      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.textMuted,
       marginBottom: 2,
     },
     manageButton: {
@@ -94,6 +96,11 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.templatesBorder,
       padding: 16,
       gap: 4,
+    },
+    manageTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     manageTitle: {
       fontSize: 15,

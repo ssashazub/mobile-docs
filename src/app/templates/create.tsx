@@ -11,10 +11,11 @@ import {
   View,
 } from 'react-native';
 import { type Href, Stack, router, useFocusEffect } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
-import { TemplateFieldEditor } from '@/components/template-field-editor';
+import { TemplateFieldsList } from '@/components/template-field-editor';
 import { TemplateIconPicker } from '@/components/template-icon-picker';
 import { TemplateIconView } from '@/components/template-icon-view';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -258,22 +259,28 @@ export default function CreateTemplateScreen() {
 
           <View style={styles.fieldsHeader}>
             <Text style={styles.fieldsTitle}>{t('templates.templateFieldsTitle')}</Text>
-            <Pressable onPress={addField} style={({ pressed }) => [styles.addField, pressed && styles.pressed]}>
-              <Text style={styles.addFieldText}>+ {t('templates.addField')}</Text>
-            </Pressable>
           </View>
 
           <View style={styles.fields}>
-            {fields.map((field, index) => (
-              <TemplateFieldEditor
-                key={field.key}
-                field={field}
-                index={index}
-                onChange={(nextField) => updateField(index, nextField)}
-                onDelete={() => removeField(index)}
-                canDelete={fields.length > 1}
+            <TemplateFieldsList
+              fields={fields}
+              onChangeField={updateField}
+              onDeleteField={removeField}
+            />
+
+            <Pressable
+              onPress={addField}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.addFieldButton, pressed && styles.pressed]}
+            >
+              <SymbolView
+                name={{ ios: 'plus', android: 'add', web: 'add' }}
+                size={16}
+                tintColor={colors.primary}
+                weight="semibold"
               />
-            ))}
+              <Text style={styles.addFieldButtonText}>{t('templates.addField')}</Text>
+            </Pressable>
           </View>
 
           <View style={styles.actions}>
@@ -360,13 +367,24 @@ function createStyles(colors: ThemeColors) {
     colorDotActive: { borderWidth: 3, borderColor: colors.text },
     fieldsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     fieldsTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
-    addField: {
-      backgroundColor: colors.primarySoft,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 999,
+    addFieldButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      minHeight: 44,
+      borderRadius: AppDesign.radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      backgroundColor: 'transparent',
+      paddingHorizontal: 14,
     },
-    addFieldText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+    addFieldButtonText: {
+      color: colors.primary,
+      fontWeight: '700',
+      fontSize: 14,
+    },
     fields: { gap: 12 },
     actions: { gap: 10, marginTop: 8 },
     pressed: { opacity: 0.88 },

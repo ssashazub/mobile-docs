@@ -38,9 +38,9 @@ export const invoiceDefinition: BuiltinTemplateDefinition = {
       en: { label: 'Recipient', placeholder: 'John Smith' },
     }),
     defineField('items', {
-      uk: { label: 'Позиції та послуги', placeholder: 'Розробка — 40 000 грн\nДизайн — 10 000 грн' },
-      ru: { label: 'Позиции и услуги', placeholder: 'Разработка — 40 000 грн\nДизайн — 10 000 грн' },
-      en: { label: 'Items and services', placeholder: 'Development — 40,000 UAH\nDesign — 10,000 UAH' },
+      uk: { label: 'Позиції та послуги', placeholder: 'Розробка - 40 000 грн\nДизайн - 10 000 грн' },
+      ru: { label: 'Позиции и услуги', placeholder: 'Разработка - 40 000 грн\nДизайн - 10 000 грн' },
+      en: { label: 'Items and services', placeholder: 'Development - 40,000 UAH\nDesign - 10,000 UAH' },
     }, { multiline: true }),
     defineField('amount', {
       uk: { label: 'Сума без ПДВ', placeholder: '50 000 грн' },

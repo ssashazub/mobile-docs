@@ -35,6 +35,7 @@ const SPRING = { damping: 18, stiffness: 220, mass: 0.8 };
 
 type ThemeSwitcherProps = {
   compact?: boolean;
+  showCaption?: boolean;
 };
 
 function ThemeIcon({
@@ -59,7 +60,7 @@ function ThemeIcon({
   );
 }
 
-export function ThemeSwitcher({ compact = false }: ThemeSwitcherProps) {
+export function ThemeSwitcher({ compact = false, showCaption = true }: ThemeSwitcherProps) {
   const { t } = useI18n();
   const colors = useTheme();
   const { preference, setPreference } = useThemePreference();
@@ -117,7 +118,7 @@ export function ThemeSwitcher({ compact = false }: ThemeSwitcherProps) {
 
   return (
     <View style={styles.wrapper}>
-      {!compact ? <Text style={styles.caption}>{t('theme.appearance')}</Text> : null}
+      {!compact && showCaption ? <Text style={styles.caption}>{t('theme.appearance')}</Text> : null}
 
       <Animated.View style={[styles.shell, shellStyle]}>
         <Pressable

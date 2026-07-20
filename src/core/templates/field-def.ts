@@ -33,7 +33,7 @@ export function resolveTemplateFields(
   });
 }
 
-/** Частые ключи полей — используйте для единообразия между шаблонами. */
+/** Частые ключи полей - используйте для единообразия между шаблонами. */
 export const CommonFieldKeys = {
   title: 'title',
   client: 'client',

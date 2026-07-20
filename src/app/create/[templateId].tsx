@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TemplateIconView } from '@/components/template-icon-view';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
+import { LoadingState } from '@/components/ui/loading-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
@@ -112,7 +113,7 @@ export default function CreateDocumentFormScreen() {
   if (loading) {
     return (
       <ThemedView style={styles.centered}>
-        <Text style={styles.centeredText}>{t('create.loadingTemplate')}</Text>
+        <LoadingState />
       </ThemedView>
     );
   }

@@ -10,7 +10,7 @@ export function escapeHtml(value: string): string {
 export function formatFieldValue(
   value: string | undefined,
   multiline?: boolean,
-  fallback = '—'
+  fallback = '-'
 ): string {
   const text = value?.trim() || fallback;
   const escaped = escapeHtml(text);
@@ -36,10 +36,24 @@ export function wrapPdfPage(content: string, styles: string, locale: string): st
       <head>
         <meta charset="utf-8" />
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-        <style>${styles}</style>
+        <meta name="color-scheme" content="light" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no"
+        />
+        <style>
+          :root { color-scheme: light only; }
+          ${styles}
+        </style>
       </head>
       <body>
-        <div class="page">${content}</div>
+        <table class="page-shell" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td width="100%" valign="top" style="width:100%;">
+              <div class="page">${content}</div>
+            </td>
+          </tr>
+        </table>
       </body>
     </html>
   `;

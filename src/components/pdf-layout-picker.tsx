@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 
 import { PdfStyleConstructor } from '@/components/pdf-style-constructor';
 import { PrimaryButton } from '@/components/ui/primary-button';
@@ -252,11 +253,23 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
                 pressed && styles.pressed,
               ]}
             >
+              {selected ? (
+                <View style={[styles.checkBadge, { backgroundColor: accentColor }]}>
+                  <SymbolView
+                    name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                    size={12}
+                    tintColor="#ffffff"
+                    weight="bold"
+                  />
+                </View>
+              ) : null}
               <LayoutPreview layout={layout} accentColor={accentColor} selected={selected} styles={styles} />
               <Text style={[styles.cardTitle, selected && { color: accentColor }]}>
                 {t(labels.title)}
               </Text>
-              <Text style={styles.cardDesc}>{t(labels.desc)}</Text>
+              <Text style={styles.cardDesc} numberOfLines={1}>
+                {t(labels.desc)}
+              </Text>
             </Pressable>
           );
         })}
@@ -270,11 +283,23 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
             pressed && styles.pressed,
           ]}
         >
+          {isCustomSelected ? (
+            <View style={[styles.checkBadge, { backgroundColor: accentColor }]}>
+              <SymbolView
+                name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                size={12}
+                tintColor="#ffffff"
+                weight="bold"
+              />
+            </View>
+          ) : null}
           <LayoutPreview layout="custom" accentColor={accentColor} selected={isCustomSelected} styles={styles} />
           <Text style={[styles.cardTitle, isCustomSelected && { color: accentColor }]}>
             {t('pdfStyle.customLayout')}
           </Text>
-          <Text style={styles.cardDesc}>{t('pdfStyle.customLayoutDesc')}</Text>
+          <Text style={styles.cardDesc} numberOfLines={1}>
+            {t('pdfStyle.customLayoutDesc')}
+          </Text>
         </Pressable>
       </View>
 
@@ -308,7 +333,6 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
       <View style={styles.actionsRow}>
         <PrimaryButton
           label={t('pdfStyle.saveStyle')}
-          variant="secondary"
           onPress={() => setSaveModalVisible(true)}
         />
       </View>
@@ -397,9 +421,22 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       padding: 12,
       gap: 8,
+      position: 'relative',
+      overflow: 'hidden',
       ...AppDesign.cardShadow,
     },
     cardSelected: { backgroundColor: colors.backgroundSoft },
+    checkBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      zIndex: 2,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     pressed: { opacity: 0.92 },
     cardTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
     cardDesc: { fontSize: 11, lineHeight: 15, color: colors.textSecondary },

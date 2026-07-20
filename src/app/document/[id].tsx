@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
+import { type Href, Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TemplateIconView } from '@/components/template-icon-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LoadingState } from '@/components/ui/loading-state';
 import { AppDesign } from '@/constants/app-design';
 import { getDocumentDisplayInfo, isImportedFormDocument } from '@/lib/document-display';
 import { formatFormFieldDisplayValue } from '@/lib/pdf-form';
@@ -39,7 +40,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <ThemedText type="small" themeColor="textSecondary" style={rowStyles.detailLabel}>
         {label}
       </ThemedText>
-      <ThemedText style={rowStyles.detailValue}>{value || '—'}</ThemedText>
+      <ThemedText style={rowStyles.detailValue}>{value || '-'}</ThemedText>
     </View>
   );
 }
@@ -129,24 +130,29 @@ export default function DocumentDetailsScreen() {
       return;
     }
 
-    setExporting(true);
-
-    try {
-      await exportDocumentPdf(document);
-    } catch (error) {
-      Alert.alert(
-        t('document.exportError'),
-        error instanceof Error ? error.message : t('pdf.generateFailed')
-      );
-    } finally {
-      setExporting(false);
+    // Imported PDFs: skip in-app preview for now (WebView can't show the file reliably).
+    if (isImportedFormDocument(document)) {
+      setExporting(true);
+      try {
+        await exportDocumentPdf(document);
+      } catch (error) {
+        Alert.alert(
+          t('document.exportError'),
+          error instanceof Error ? error.message : t('pdf.generateFailed')
+        );
+      } finally {
+        setExporting(false);
+      }
+      return;
     }
+
+    router.push(`/document/preview/${document.id}` as Href);
   };
 
   if (loading) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator size="large" />
+        <LoadingState />
       </ThemedView>
     );
   }
@@ -233,7 +239,7 @@ export default function DocumentDetailsScreen() {
             ]}
           >
             <ThemedText style={styles.pdfButtonText}>
-              {exporting ? t('document.exportingPdf') : `📄 ${t('document.exportPdf')}`}
+              {exporting ? t('document.exportingPdf') : t('document.exportPdf')}
             </ThemedText>
           </Pressable>
         </ScrollView>

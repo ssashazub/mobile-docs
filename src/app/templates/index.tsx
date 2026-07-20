@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type Href, Stack, router, useFocusEffect } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DocumentTypeCard } from '@/components/document-type-card';
@@ -57,7 +58,15 @@ export default function TemplatesScreen() {
             style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}
             onPress={() => router.push('/templates/create' as Href)}
           >
-            <Text style={styles.createTitle}>+ {t('templates.createTemplate')}</Text>
+            <View style={styles.createTitleRow}>
+              <SymbolView
+                name={{ ios: 'plus', android: 'add', web: 'add' }}
+                size={18}
+                tintColor="#ffffff"
+                weight="semibold"
+              />
+              <Text style={styles.createTitle}>{t('templates.createTemplate')}</Text>
+            </View>
             <Text style={styles.createSubtitle}>{t('templates.createSubtitle')}</Text>
           </Pressable>
 
@@ -120,6 +129,11 @@ function createStyles(colors: ThemeColors) {
       padding: 18,
       gap: 4,
       ...AppDesign.shadow,
+    },
+    createTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     createTitle: {
       color: '#fff',

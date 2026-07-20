@@ -103,7 +103,7 @@ export function TemplateIconPicker({ value, onChange }: TemplateIconPickerProps)
             pressed && styles.pressed,
           ]}
         >
-          <Text style={[styles.noneChipText, isNone && styles.noneChipTextSelected]}>—</Text>
+          <Text style={[styles.noneChipText, isNone && styles.noneChipTextSelected]}>-</Text>
         </Pressable>
       </View>
 

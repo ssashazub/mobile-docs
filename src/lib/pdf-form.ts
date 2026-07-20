@@ -131,12 +131,12 @@ export async function applyFormFieldValues(
 
 export function formatFormFieldDisplayValue(field: PdfFormField, value: string): string {
   if (field.type === 'checkbox') {
-    return isCheckboxChecked(value) ? '✓' : '—';
+    return isCheckboxChecked(value) ? '✓' : '-';
   }
 
   if ((field.type === 'radio' || field.type === 'dropdown') && !value.trim()) {
-    return '—';
+    return '-';
   }
 
-  return value || '—';
+  return value || '-';
 }

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +15,7 @@ import { TemplateIconBadge } from '@/components/template-icon-view';
 import { PdfFormFieldInput } from '@/components/pdf-form-field';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
+import { LoadingState } from '@/components/ui/loading-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -195,7 +195,7 @@ export default function EditDocumentScreen() {
   if (loading) {
     return (
       <ThemedView style={styles.centered}>
-        <ActivityIndicator size="large" />
+        <LoadingState />
       </ThemedView>
     );
   }
