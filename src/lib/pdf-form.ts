@@ -4,11 +4,19 @@ import {
   PDFDropdown,
   PDFRadioGroup,
   PDFTextField,
+  setFontAndSize,
   type PDFField,
 } from 'pdf-lib';
 
 import type { PdfFormField, PdfFormFieldType } from '@/types/document';
 import { inferPdfFormFieldInputKind } from '@/lib/field-validation';
+
+/** Keep filled values readable next to printed field labels. */
+const FORM_FONT_MIN = 7;
+const FORM_FONT_MAX = 10;
+const FORM_FONT_DEFAULT = 9;
+
+const TF_REGEX = /\/([^\0\t\n\f\r ]+)[\0\t\n\f\r ]+(\d*\.\d+|\d+)[\0\t\n\f\r ]+Tf/;
 
 export function isCheckboxChecked(value: string): boolean {
   const normalized = value.trim().toLowerCase();
@@ -91,6 +99,75 @@ export function extractFormFields(pdfDoc: PDFDocument): PdfFormField[] {
   });
 }
 
+function readDaFontSize(da: string | undefined): number | undefined {
+  if (!da) {
+    return undefined;
+  }
+
+  const match = TF_REGEX.exec(da);
+  if (!match) {
+    return undefined;
+  }
+
+  const size = Number(match[2]);
+  return Number.isFinite(size) ? size : undefined;
+}
+
+function rewriteDaFontSize(da: string | undefined, fontSize: number): string {
+  if (!da?.trim()) {
+    return `${setFontAndSize('Helv', fontSize).toString()} 0 g`;
+  }
+
+  if (TF_REGEX.test(da)) {
+    return da.replace(TF_REGEX, `/$1 ${fontSize} Tf`);
+  }
+
+  return `${da.trim()}\n${setFontAndSize('Helv', fontSize).toString()}`;
+}
+
+function getPrimaryWidgetHeight(field: PDFTextField | PDFDropdown): number {
+  const widgets = field.acroField.getWidgets();
+  if (widgets.length === 0) {
+    return FORM_FONT_DEFAULT * 1.6;
+  }
+
+  const height = Math.abs(widgets[0]!.getRectangle().height);
+  return height > 0 ? height : FORM_FONT_DEFAULT * 1.6;
+}
+
+/**
+ * pdf-lib auto-fits text when /DA size is 0/missing — short values in tall
+ * widgets become huge and crowd printed labels. Cap to a form-like size.
+ */
+function resolveFormFontSize(field: PDFTextField | PDFDropdown): number {
+  const height = getPrimaryWidgetHeight(field);
+  const fieldDaSize = readDaFontSize(field.acroField.getDefaultAppearance());
+  const widgetDaSize = readDaFontSize(field.acroField.getWidgets()[0]?.getDefaultAppearance());
+  const declared = fieldDaSize ?? widgetDaSize;
+
+  if (declared && declared >= FORM_FONT_MIN && declared <= FORM_FONT_MAX) {
+    return declared;
+  }
+
+  // ~60% of widget height, hard-capped so tall section boxes stay label-friendly.
+  const fitted = Math.floor(height * 0.6);
+  return Math.min(FORM_FONT_MAX, Math.max(FORM_FONT_MIN, fitted || FORM_FONT_DEFAULT));
+}
+
+function applyFormFontSize(field: PDFTextField | PDFDropdown, fontSize: number): void {
+  field.acroField.setDefaultAppearance(
+    rewriteDaFontSize(field.acroField.getDefaultAppearance(), fontSize)
+  );
+
+  for (const widget of field.acroField.getWidgets()) {
+    const widgetDa = widget.getDefaultAppearance();
+    // Widget-level /DA with Tf 0 wins over the field and re-triggers auto-size.
+    if (widgetDa) {
+      widget.setDefaultAppearance(rewriteDaFontSize(widgetDa, fontSize));
+    }
+  }
+}
+
 export async function applyFormFieldValues(
   pdfBytes: Uint8Array,
   values: Record<string, string>
@@ -103,6 +180,7 @@ export async function applyFormFieldValues(
       const field = form.getField(name);
 
       if (field instanceof PDFTextField) {
+        applyFormFontSize(field, resolveFormFontSize(field));
         field.setText(value);
       } else if (field instanceof PDFCheckBox) {
         if (isCheckboxChecked(value)) {
@@ -117,6 +195,7 @@ export async function applyFormFieldValues(
           field.clear();
         }
       } else if (field instanceof PDFDropdown) {
+        applyFormFontSize(field, resolveFormFontSize(field));
         if (value.trim()) {
           field.select(value);
         }
