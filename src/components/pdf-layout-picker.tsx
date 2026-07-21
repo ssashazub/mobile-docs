@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -15,6 +14,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { PdfStyleConstructor } from '@/components/pdf-style-constructor';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { AppDesign } from '@/constants/app-design';
 import { DEFAULT_PDF_DESIGN, LAYOUT_DESIGN_PRESETS, PDF_LAYOUTS } from '@/constants/pdf-layouts';
 import { type ThemeColors } from '@/constants/theme';
@@ -194,7 +194,7 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
 
   const handleSaveStyle = async () => {
     if (!styleName.trim()) {
-      Alert.alert(t('pdfStyle.enterStyleName'));
+      showAppAlert(t('pdfStyle.enterStyleName'));
       return;
     }
 
@@ -220,7 +220,7 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
     onChange(pdfStyleFromSavedStyle(saved));
   };
 
-  const isCustomSelected = value.layout === 'custom';
+  const isCustomSelected = value.layout === 'custom' && !value.savedStyleId;
 
   return (
     <View style={styles.wrap}>
@@ -309,18 +309,35 @@ export function PdfLayoutPicker({ value, accentColor, gradientEnd, onChange }: P
           <View style={styles.savedRow}>
             {savedStyles.map((saved) => {
               const selected = value.savedStyleId === saved.id;
+              const selectedAccent = saved.design.accentColor ?? accentColor;
 
               return (
                 <Pressable
                   key={saved.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
                   onPress={() => selectSavedStyle(saved)}
                   style={({ pressed }) => [
                     styles.savedChip,
-                    selected && { borderColor: accentColor, backgroundColor: colors.chipSelected },
+                    selected && styles.savedChipSelected,
+                    selected && {
+                      borderColor: selectedAccent,
+                      backgroundColor: colors.chipSelected,
+                    },
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Text style={[styles.savedChipText, selected && { color: accentColor }]}>
+                  {selected ? (
+                    <View style={[styles.savedCheck, { backgroundColor: selectedAccent }]}>
+                      <SymbolView
+                        name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                        size={12}
+                        tintColor="#ffffff"
+                        weight="bold"
+                      />
+                    </View>
+                  ) : null}
+                  <Text style={[styles.savedChipText, selected && { color: selectedAccent }]}>
                     {saved.name}
                   </Text>
                 </Pressable>
@@ -485,12 +502,27 @@ function createStyles(colors: ThemeColors) {
     savedTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
     savedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     savedChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
       borderWidth: 1.5,
       borderColor: colors.border,
       borderRadius: 999,
       paddingHorizontal: 14,
       paddingVertical: 8,
       backgroundColor: colors.surface,
+    },
+    savedChipSelected: {
+      borderWidth: 2,
+      paddingHorizontal: 13.5,
+      paddingVertical: 7.5,
+    },
+    savedCheck: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     savedChipText: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
     actionsRow: { flexDirection: 'row', gap: 10 },

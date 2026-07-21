@@ -2,6 +2,14 @@ export type AppLocale = 'uk' | 'ru' | 'en';
 
 export type TranslationSchema = {
   common: {
+    ok: string;
+    more: string;
+    navigationMenu: string;
+    mainMenu: string;
+    documentLibrary: string;
+    saveChangesTitle: string;
+    saveChangesText: string;
+    discardChanges: string;
     cancel: string;
     save: string;
     back: string;
@@ -158,6 +166,17 @@ export type TranslationSchema = {
     printingPdf: string;
     sharePdf: string;
     sharingPdf: string;
+    savePdf: string;
+    savingPdf: string;
+    more: string;
+    actions: string;
+    chooseAction: string;
+    saveToLibrary: string;
+    rename: string;
+    renameTitle: string;
+    namePlaceholder: string;
+    actionError: string;
+    actionFailed: string;
     editTitle: string;
     editHint: string;
     templateNotFound: string;

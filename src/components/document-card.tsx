@@ -21,6 +21,7 @@ type DocumentCardProps = {
   template?: DocumentTemplate | null;
   onPress: () => void;
   onLongPress: () => void;
+  compact?: boolean;
 };
 
 const SPRING = { damping: 16, stiffness: 280, mass: 0.65 };
@@ -30,10 +31,11 @@ export function DocumentCard({
   template,
   onPress,
   onLongPress,
+  compact = false,
 }: DocumentCardProps) {
   const { t, dateLocale } = useI18n();
   const colors = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, compact), [colors, compact]);
   const display = getDocumentDisplayInfo(document, template);
   const scale = useSharedValue(1);
 
@@ -77,14 +79,14 @@ export function DocumentCard({
             </Text>
           </View>
 
-          <Text style={styles.title} numberOfLines={2}>
+          <Text style={styles.title} numberOfLines={compact ? 1 : 2}>
             {document.title}
           </Text>
           <Text style={styles.meta} numberOfLines={1}>
             {t('home.client')}: {document.client || '-'}
           </Text>
           {document.description ? (
-            <Text style={styles.description} numberOfLines={2}>
+            <Text style={styles.description} numberOfLines={1}>
               {document.description}
             </Text>
           ) : null}
@@ -95,7 +97,7 @@ export function DocumentCard({
   );
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles(colors: ThemeColors, compact: boolean) {
   return StyleSheet.create({
     card: {
       flexDirection: 'row',
@@ -111,9 +113,9 @@ function createStyles(colors: ThemeColors) {
     },
     body: {
       flex: 1,
-      paddingVertical: 14,
+      paddingVertical: compact ? 10 : 11,
       paddingHorizontal: 14,
-      gap: 6,
+      gap: 4,
       minWidth: 0,
     },
     topRow: {
@@ -129,7 +131,7 @@ function createStyles(colors: ThemeColors) {
       maxWidth: '72%',
       borderRadius: 999,
       paddingHorizontal: 10,
-      paddingVertical: 5,
+      paddingVertical: 4,
     },
     badgeText: {
       flexShrink: 1,
@@ -144,26 +146,26 @@ function createStyles(colors: ThemeColors) {
       fontWeight: '600',
     },
     title: {
-      fontSize: 18,
+      fontSize: compact ? 17 : 18,
       fontWeight: '800',
       color: colors.text,
-      lineHeight: 24,
+      lineHeight: compact ? 21 : 24,
     },
     meta: {
-      fontSize: 14,
+      fontSize: compact ? 13 : 14,
       color: colors.textSecondary,
       fontWeight: '500',
     },
     description: {
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: compact ? 12 : 13,
+      lineHeight: compact ? 15 : 17,
       color: colors.textMuted,
     },
     hint: {
-      marginTop: 2,
-      fontSize: 11,
-      color: colors.hint,
-      fontWeight: '600',
+      marginTop: 1,
+      fontSize: 10,
+      color: colors.textMuted,
+      fontWeight: '500',
     },
   });
 }

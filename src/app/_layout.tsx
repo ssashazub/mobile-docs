@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { AppAlertProvider } from '@/components/ui/app-alert';
 import { AppSettingsProvider } from '@/contexts/app-settings-context';
 import { LocalePreferenceProvider } from '@/contexts/locale-preference-context';
 import { ThemePreferenceProvider } from '@/contexts/theme-preference-context';
@@ -45,7 +46,9 @@ export default function RootLayout() {
     <ThemePreferenceProvider>
       <LocalePreferenceProvider>
         <AppSettingsProvider>
-          <RootNavigator />
+          <AppAlertProvider>
+            <RootNavigator />
+          </AppAlertProvider>
         </AppSettingsProvider>
       </LocalePreferenceProvider>
     </ThemePreferenceProvider>

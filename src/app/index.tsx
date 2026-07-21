@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +23,7 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { DocumentCard } from '@/components/document-card';
 import { TemplateIconView } from '@/components/template-icon-view';
 import { AppDesign } from '@/constants/app-design';
@@ -96,10 +96,10 @@ export default function HomeScreen() {
     () =>
       [...documents]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 2),
+        .slice(0, 3),
     [documents]
   );
-  const hasMoreDocuments = documents.length > 2;
+  const hasMoreDocuments = documents.length > 3;
 
   const templatesMap = useMemo(
     () => Object.fromEntries(templates.map((template) => [template.id, template])),
@@ -141,7 +141,7 @@ export default function HomeScreen() {
       if (error instanceof ImportCancelledError) {
         return;
       }
-      Alert.alert(
+      showAppAlert(
         t('import.errorTitle'),
         error instanceof Error ? error.message : t('import.errorTitle')
       );
@@ -310,6 +310,7 @@ export default function HomeScreen() {
                   <DocumentCard
                     document={doc}
                     template={template}
+                    compact
                     onPress={() => router.push(`/document/${doc.id}`)}
                     onLongPress={() => setSelectedDocument(doc)}
                   />
@@ -336,19 +337,19 @@ export default function HomeScreen() {
                 {
                   key: 'open',
                   label: t('common.open'),
-                  icon: '👁️',
+                  symbol: { ios: 'eye.fill', android: 'visibility', web: 'visibility' },
                   onPress: () => router.push(`/document/${selectedDocument.id}`),
                 },
                 {
                   key: 'edit',
                   label: t('common.edit'),
-                  icon: '✏️',
+                  symbol: { ios: 'pencil', android: 'edit', web: 'edit' },
                   onPress: () => router.push(`/document/edit/${selectedDocument.id}`),
                 },
                 {
                   key: 'delete',
                   label: t('common.delete'),
-                  icon: '🗑️',
+                  symbol: { ios: 'trash.fill', android: 'delete', web: 'delete' },
                   tone: 'danger',
                   onPress: () => deleteDocument(selectedDocument.id),
                 },
@@ -576,9 +577,9 @@ function createStyles(colors: ThemeColors) {
     container: {
       flexGrow: 1,
       paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 36,
-      gap: 16,
+      paddingTop: 8,
+      paddingBottom: 20,
+      gap: 8,
     },
     topBar: {
       flexDirection: 'row',
@@ -611,9 +612,9 @@ function createStyles(colors: ThemeColors) {
       letterSpacing: -0.2,
     },
     brandMeta: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '500',
+      color: colors.textMuted,
     },
     iconButton: {
       width: 44,
@@ -635,14 +636,14 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 14,
-      paddingVertical: 18,
-      paddingHorizontal: 18,
-      minHeight: 88,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      minHeight: 80,
     },
     createIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 16,
+      width: 44,
+      height: 44,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: 'rgba(255,255,255,0.18)',
@@ -677,8 +678,8 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      minHeight: 68,
-      paddingVertical: 12,
+      minHeight: 64,
+      paddingVertical: 10,
       paddingHorizontal: 12,
     },
     quickLoading: {
@@ -712,7 +713,7 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      marginTop: 8,
+      marginTop: 3,
       paddingHorizontal: 4,
     },
     listTitle: {
@@ -772,6 +773,7 @@ function createStyles(colors: ThemeColors) {
       color: colors.primary,
     },
     emptyState: {
+      marginVertical: 8,
       backgroundColor: colors.surface,
       borderRadius: AppDesign.radius.xl,
       borderWidth: 1,
@@ -853,7 +855,7 @@ function createStyles(colors: ThemeColors) {
       maxWidth: 280,
     },
     list: {
-      gap: 12,
+      gap: 8,
     },
   });
 }

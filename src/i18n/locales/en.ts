@@ -2,6 +2,14 @@ import type { TranslationSchema } from '@/i18n/types';
 
 export const en: TranslationSchema = {
     common: {
+        ok: 'OK',
+        more: 'More',
+        navigationMenu: 'Quick Access',
+        mainMenu: 'Main menu',
+        documentLibrary: 'Document library',
+        saveChangesTitle: 'Save changes?',
+        saveChangesText: 'You can save your changes before leaving.',
+        discardChanges: 'Don’t save',
         cancel: 'Cancel',
         save: 'Save',
         back: 'Back',
@@ -166,6 +174,17 @@ export const en: TranslationSchema = {
         printingPdf: 'Opening print...',
         sharePdf: 'Share',
         sharingPdf: 'Sharing...',
+        savePdf: 'Save PDF',
+        savingPdf: 'Saving...',
+        more: 'More',
+        actions: 'Document actions',
+        chooseAction: 'Choose what to do next',
+        saveToLibrary: 'Save to library',
+        rename: 'Rename',
+        renameTitle: 'Rename document',
+        namePlaceholder: 'Enter a name',
+        actionError: 'Could not complete action',
+        actionFailed: 'Please try again.',
         editTitle: 'Editing',
         editHint:
             'Field names come from the template. To change them, open Templates.',

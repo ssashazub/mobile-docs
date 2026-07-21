@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,19 +8,22 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { type Href, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TemplateIconView } from '@/components/template-icon-view';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { LoadingState } from '@/components/ui/loading-state';
+import { showAppAlert } from '@/components/ui/app-alert';
+import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
@@ -75,17 +77,28 @@ export default function CreateDocumentFormScreen() {
     setFields((current) => ({ ...current, [key]: value }));
   };
 
-  const handleCreate = async () => {
-    if (!template) {
+  const navigateAfterExit = (destination: 'home' | 'library') => {
+    if (destination === 'home') {
+      router.dismissAll();
       return;
+    }
+
+    router.replace('/documents' as Href);
+  };
+
+  const handleCreate = async (
+    destination: 'detail' | 'home' | 'library' | 'none' = 'detail'
+  ): Promise<boolean> => {
+    if (!template) {
+      return false;
     }
 
     const validationError = validateTemplateFields(template.fields, fields);
 
     if (validationError) {
       const alert = getFieldValidationAlert(validationError, t);
-      Alert.alert(alert.title, alert.message);
-      return;
+      showAppAlert(alert.title, alert.message);
+      return false;
     }
 
     setSaving(true);
@@ -102,11 +115,34 @@ export default function CreateDocumentFormScreen() {
       );
 
       await addDocument(newDocument);
-      router.replace(`/document/${newDocument.id}`);
+      if (destination === 'detail') {
+        allowNavigation();
+        router.replace(`/document/${newDocument.id}`);
+      } else if (destination !== 'none') {
+        navigateAfterExit(destination);
+      }
+      return true;
     } finally {
       setSaving(false);
     }
   };
+
+  const hasChanges = useMemo(() => {
+    if (!template) {
+      return false;
+    }
+
+    const initialStyle = normalizePdfStyle(template.pdfStyle, template.id);
+    return (
+      Object.values(fields).some((value) => value.length > 0) ||
+      JSON.stringify(pdfStyle) !== JSON.stringify(initialStyle)
+    );
+  }, [fields, pdfStyle, template]);
+
+  const allowNavigation = useUnsavedChangesGuard({
+    hasChanges,
+    onSave: () => handleCreate('none'),
+  });
 
   const fieldList = useMemo(() => template?.fields ?? [], [template]);
 
@@ -129,7 +165,17 @@ export default function CreateDocumentFormScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: template.title }} />
+      <Stack.Screen
+        options={{
+          title: template.title,
+          headerRight: () => (
+            <EditorOverflowMenu
+              onGoHome={() => navigateAfterExit('home')}
+              onOpenLibrary={() => navigateAfterExit('library')}
+            />
+          ),
+        }}
+      />
       <ThemedView style={styles.screen}>
         <KeyboardAvoidingView
           style={styles.flex}
@@ -192,7 +238,7 @@ export default function CreateDocumentFormScreen() {
           <View style={styles.actions}>
             <PrimaryButton
               label={t('create.createDocument')}
-              onPress={handleCreate}
+              onPress={() => void handleCreate()}
               loading={saving}
             />
             <PrimaryButton

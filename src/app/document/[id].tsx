@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { TemplateIconView } from '@/components/template-icon-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LoadingState } from '@/components/ui/loading-state';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { AppDesign } from '@/constants/app-design';
 import { getDocumentDisplayInfo, isImportedFormDocument } from '@/lib/document-display';
 import { formatFormFieldDisplayValue } from '@/lib/pdf-form';
@@ -136,7 +137,7 @@ export default function DocumentDetailsScreen() {
       try {
         await exportDocumentPdf(document);
       } catch (error) {
-        Alert.alert(
+        showAppAlert(
           t('document.exportError'),
           error instanceof Error ? error.message : t('pdf.generateFailed')
         );

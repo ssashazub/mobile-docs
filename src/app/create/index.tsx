@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DocumentTypeCard } from '@/components/document-type-card';
+import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
@@ -30,7 +31,14 @@ export default function CreateDocumentTypeScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: t('create.screenTitle') }} />
+      <Stack.Screen
+        options={{
+          title: t('create.screenTitle'),
+          headerRight: () => (
+            <EditorOverflowMenu onGoHome={() => router.dismissAll()} />
+          ),
+        }}
+      />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           <Text style={styles.heading}>{t('create.chooseTemplate')}</Text>

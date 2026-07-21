@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,13 +17,16 @@ import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { TemplateFieldsList } from '@/components/template-field-editor';
 import { TemplateIconPicker } from '@/components/template-icon-picker';
 import { TemplateIconView } from '@/components/template-icon-view';
+import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { DEFAULT_PDF_STYLE } from '@/constants/pdf-layouts';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import {
   cloneTemplateFields,
   createBlankTemplate,
@@ -100,7 +102,7 @@ export default function CreateTemplateScreen() {
 
   const removeField = (index: number) => {
     if (fields.length <= 1) {
-      Alert.alert(t('templates.minOneField'));
+      showAppAlert(t('templates.minOneField'));
       return;
     }
     setFields((current) => current.filter((_, itemIndex) => itemIndex !== index));
@@ -110,15 +112,15 @@ export default function CreateTemplateScreen() {
     setFields((current) => [...current, createEmptyField(current.map((field) => field.key))]);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (navigateAfterSave = true): Promise<boolean> => {
     if (!title.trim()) {
-      Alert.alert(t('templates.enterTemplateName'));
-      return;
+      showAppAlert(t('templates.enterTemplateName'));
+      return false;
     }
 
     if (fields.some((field) => !field.label.trim())) {
-      Alert.alert(t('templates.allFieldsNeedLabel'));
-      return;
+      showAppAlert(t('templates.allFieldsNeedLabel'));
+      return false;
     }
 
     setSaving(true);
@@ -139,15 +141,42 @@ export default function CreateTemplateScreen() {
       });
 
       await saveTemplate(template);
-      router.replace(`/templates/edit/${template.id}` as Href);
+      if (navigateAfterSave) {
+        allowNavigation();
+        router.replace(`/templates/edit/${template.id}` as Href);
+      }
+      return true;
     } finally {
       setSaving(false);
     }
   };
 
+  const hasChanges = useMemo(
+    () =>
+      baseTemplateId !== 'blank' ||
+      title !== blank.title ||
+      JSON.stringify(icon) !== JSON.stringify(blank.icon) ||
+      colorIndex !== 4 ||
+      JSON.stringify(fields) !== JSON.stringify(blank.fields) ||
+      JSON.stringify(pdfStyle) !== JSON.stringify(DEFAULT_PDF_STYLE),
+    [baseTemplateId, blank.fields, blank.icon, blank.title, colorIndex, fields, icon, pdfStyle, title]
+  );
+
+  const allowNavigation = useUnsavedChangesGuard({
+    hasChanges,
+    onSave: () => handleSave(false),
+  });
+
   return (
     <>
-      <Stack.Screen options={{ title: t('templates.newTemplate') }} />
+      <Stack.Screen
+        options={{
+          title: t('templates.newTemplate'),
+          headerRight: () => (
+            <EditorOverflowMenu onGoHome={() => router.dismissAll()} />
+          ),
+        }}
+      />
       <KeyboardAvoidingView
         style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -284,7 +313,11 @@ export default function CreateTemplateScreen() {
           </View>
 
           <View style={styles.actions}>
-            <PrimaryButton label={t('templates.saveTemplate')} onPress={handleSave} loading={saving} />
+            <PrimaryButton
+              label={t('templates.saveTemplate')}
+              onPress={() => void handleSave()}
+              loading={saving}
+            />
             <PrimaryButton
               label={t('common.cancel')}
               variant="secondary"

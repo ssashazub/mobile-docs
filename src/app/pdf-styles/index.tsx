@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppDesign } from '@/constants/app-design';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
@@ -28,7 +29,7 @@ export default function PdfStylesScreen() {
   );
 
   const handleDelete = (style: SavedPdfStyle) => {
-    Alert.alert(
+    showAppAlert(
       t('pdfStyle.deleteTitle'),
       t('pdfStyle.deleteText', { name: style.name }),
       [

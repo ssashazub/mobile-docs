@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -8,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
+import { type Href, Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TemplateIconBadge } from '@/components/template-icon-view';
@@ -16,6 +15,8 @@ import { PdfFormFieldInput } from '@/components/pdf-form-field';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { LoadingState } from '@/components/ui/loading-state';
+import { showAppAlert } from '@/components/ui/app-alert';
+import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -30,6 +31,7 @@ import { getTemplateById } from '@/lib/template-storage';
 import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate, PdfStyle } from '@/types/template';
 
@@ -135,9 +137,20 @@ export default function EditDocumentScreen() {
     setFields((current) => ({ ...current, [key]: value }));
   };
 
-  const saveDocument = async () => {
-    if (documentId === null || !document) {
+  const navigateAfterExit = (destination: 'home' | 'library') => {
+    if (destination === 'home') {
+      router.dismissAll();
       return;
+    }
+
+    router.replace('/documents' as Href);
+  };
+
+  const saveDocument = async (
+    destination: 'default' | 'home' | 'library' | 'none' = 'default'
+  ): Promise<boolean> => {
+    if (documentId === null || !document) {
+      return false;
     }
 
     if (isImportedFormDocument(document) && document.formFields) {
@@ -145,16 +158,16 @@ export default function EditDocumentScreen() {
 
       if (validationError) {
         const alert = getFieldValidationAlert(validationError, t);
-        Alert.alert(alert.title, alert.message);
-        return;
+        showAppAlert(alert.title, alert.message);
+        return false;
       }
     } else if (template) {
       const validationError = validateTemplateFields(template.fields, fields);
 
       if (validationError) {
         const alert = getFieldValidationAlert(validationError, t);
-        Alert.alert(alert.title, alert.message);
-        return;
+        showAppAlert(alert.title, alert.message);
+        return false;
       }
     }
 
@@ -176,21 +189,57 @@ export default function EditDocumentScreen() {
           })),
           title: firstValue || document.title,
         });
-        router.replace(`/document/${documentId}`);
-        return;
+        if (destination === 'default') {
+          allowNavigation();
+          router.replace(`/document/${documentId}`);
+        } else if (destination !== 'none') {
+          navigateAfterExit(destination);
+        }
+        return true;
       }
 
       if (!template || !fields.title?.trim()) {
-        return;
+        return false;
       }
 
       const updatedDocument = buildDocumentFromFields(template, fields, documentId, pdfStyle);
       await updateDocument({ ...updatedDocument, createdAt: document.createdAt });
-      router.back();
+      if (destination === 'default') {
+        allowNavigation();
+        router.back();
+      } else if (destination !== 'none') {
+        navigateAfterExit(destination);
+      }
+      return true;
     } finally {
       setSaving(false);
     }
   };
+
+  const hasChanges = useMemo(() => {
+    if (!document) {
+      return false;
+    }
+
+    if (JSON.stringify(fields) !== JSON.stringify(document.fields)) {
+      return true;
+    }
+
+    if (isImportedFormDocument(document)) {
+      return false;
+    }
+
+    const initialStyle = normalizePdfStyle(
+      document.pdfStyle ?? template?.pdfStyle,
+      template?.id
+    );
+    return JSON.stringify(pdfStyle) !== JSON.stringify(initialStyle);
+  }, [document, fields, pdfStyle, template]);
+
+  const allowNavigation = useUnsavedChangesGuard({
+    hasChanges,
+    onSave: () => saveDocument('none'),
+  });
 
   if (loading) {
     return (
@@ -218,7 +267,15 @@ export default function EditDocumentScreen() {
   return (
     <>
       <Stack.Screen
-        options={{ title: `${t('document.editTitle')} · ${display.title}` }}
+        options={{
+          title: `${t('document.editTitle')} · ${display.title}`,
+          headerRight: () => (
+            <EditorOverflowMenu
+              onGoHome={() => navigateAfterExit('home')}
+              onOpenLibrary={() => navigateAfterExit('library')}
+            />
+          ),
+        }}
       />
 
       <ThemedView style={styles.screen}>
@@ -293,7 +350,7 @@ export default function EditDocumentScreen() {
             <View style={styles.actions}>
               <PrimaryButton
                 label={t('common.save')}
-                onPress={saveDocument}
+                onPress={() => void saveDocument()}
                 loading={saving}
                 disabled={!canSave}
               />

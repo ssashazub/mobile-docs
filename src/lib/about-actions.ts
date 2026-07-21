@@ -1,4 +1,4 @@
-import { Alert, Linking, Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as StoreReview from 'expo-store-review';
 
@@ -44,5 +44,5 @@ export async function requestAppReview(): Promise<void> {
     return;
   }
 
-  Alert.alert(t('settings.rate'), t('settings.rateUnavailable'));
+  throw new Error(t('settings.rateUnavailable'));
 }

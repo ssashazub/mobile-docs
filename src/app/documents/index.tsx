@@ -107,19 +107,19 @@ export default function DocumentsScreen() {
                 {
                   key: 'open',
                   label: t('common.open'),
-                  icon: '👁️',
+                  symbol: { ios: 'eye.fill', android: 'visibility', web: 'visibility' },
                   onPress: () => router.push(`/document/${selectedDocument.id}`),
                 },
                 {
                   key: 'edit',
                   label: t('common.edit'),
-                  icon: '✏️',
+                  symbol: { ios: 'pencil', android: 'edit', web: 'edit' },
                   onPress: () => router.push(`/document/edit/${selectedDocument.id}`),
                 },
                 {
                   key: 'delete',
                   label: t('common.delete'),
-                  icon: '🗑️',
+                  symbol: { ios: 'trash.fill', android: 'delete', web: 'delete' },
                   tone: 'danger',
                   onPress: () => {
                     void deleteDocument(selectedDocument.id);
@@ -146,13 +146,13 @@ function createStyles(colors: ThemeColors) {
       flexGrow: 1,
     },
     subtitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textMuted,
       paddingHorizontal: 2,
     },
     list: {
-      gap: 12,
+      gap: 10,
     },
     emptyState: {
       backgroundColor: colors.surface,

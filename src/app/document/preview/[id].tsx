@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, useLocalSearchParams, router } from 'expo-router';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { type Href, Stack, useLocalSearchParams, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
+import { ActionSheet } from '@/components/ui/action-sheet';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { LoadingState } from '@/components/ui/loading-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
-import { getDocuments } from '@/lib/document-storage';
+import { getDocuments, updateDocument } from '@/lib/document-storage';
 import {
   prepareDocumentPdf,
   printPreparedPdf,
@@ -130,6 +132,10 @@ export default function DocumentPdfPreviewScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<'share' | 'print' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
+  const [nameDialog, setNameDialog] = useState<'rename' | null>(null);
+  const [nameValue, setNameValue] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const loadPreview = useCallback(async () => {
     if (documentId === null) {
@@ -174,7 +180,7 @@ export default function DocumentPdfPreviewScreen() {
     try {
       await sharePreparedPdf(prepared);
     } catch (shareError) {
-      Alert.alert(
+      showAppAlert(
         t('document.exportError'),
         shareError instanceof Error ? shareError.message : t('pdf.generateFailed')
       );
@@ -196,12 +202,64 @@ export default function DocumentPdfPreviewScreen() {
       if (printError instanceof Error && /cancel|dismiss|closed/i.test(printError.message)) {
         return;
       }
-      Alert.alert(
+      showAppAlert(
         t('document.exportError'),
         printError instanceof Error ? printError.message : t('pdf.printFailed')
       );
     } finally {
       setBusy(null);
+    }
+  };
+
+  const openNameDialog = () => {
+    setNameValue(document?.title ?? '');
+    setNameDialog('rename');
+  };
+
+  const handleSaveToLibrary = async () => {
+    if (!document) {
+      return;
+    }
+
+    try {
+      await updateDocument(document);
+      router.push('/documents' as Href);
+    } catch (saveError) {
+      showAppAlert(
+        t('document.actionError'),
+        saveError instanceof Error ? saveError.message : t('document.actionFailed')
+      );
+    }
+  };
+
+  const handleNameSubmit = async () => {
+    const nextName = nameValue.trim();
+
+    if (!document || !nextName) {
+      return;
+    }
+
+    setSavingName(true);
+    try {
+      const renamedDocument: Document = {
+        ...document,
+        title: nextName,
+        fields: Object.prototype.hasOwnProperty.call(document.fields, 'title')
+          ? { ...document.fields, title: nextName }
+          : document.fields,
+      };
+      await updateDocument(renamedDocument);
+      setDocument(renamedDocument);
+      setPrepared(await prepareDocumentPdf(renamedDocument));
+
+      setNameDialog(null);
+    } catch (saveError) {
+      showAppAlert(
+        t('document.actionError'),
+        saveError instanceof Error ? saveError.message : t('document.actionFailed')
+      );
+    } finally {
+      setSavingName(false);
     }
   };
 
@@ -277,25 +335,6 @@ export default function DocumentPdfPreviewScreen() {
 
             <View style={styles.actions}>
               <Pressable
-                onPress={handlePrint}
-                disabled={busy !== null}
-                style={({ pressed }) => [
-                  styles.secondaryAction,
-                  (pressed || busy === 'print') && styles.pressed,
-                ]}
-              >
-                <SymbolView
-                  name={{ ios: 'printer.fill', android: 'print', web: 'print' }}
-                  size={18}
-                  tintColor={colors.primary}
-                  weight="semibold"
-                />
-                <Text style={styles.secondaryActionText}>
-                  {busy === 'print' ? t('document.printingPdf') : t('document.printPdf')}
-                </Text>
-              </Pressable>
-
-              <Pressable
                 onPress={handleShare}
                 disabled={busy !== null}
                 style={({ pressed }) => [
@@ -304,19 +343,107 @@ export default function DocumentPdfPreviewScreen() {
                 ]}
               >
                 <SymbolView
-                  name={{ ios: 'square.and.arrow.up', android: 'share', web: 'share' }}
+                  name={{ ios: 'arrow.down.doc.fill', android: 'download', web: 'download' }}
                   size={18}
                   tintColor="#ffffff"
                   weight="semibold"
                 />
                 <Text style={styles.primaryActionText}>
-                  {busy === 'share' ? t('document.sharingPdf') : t('document.sharePdf')}
+                  {busy === 'share' ? t('document.savingPdf') : t('document.savePdf')}
                 </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setActionsVisible(true)}
+                disabled={busy !== null}
+                style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
+              >
+                <SymbolView
+                  name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
+                  size={20}
+                  tintColor={colors.primary}
+                  weight="semibold"
+                />
+                <Text style={styles.secondaryActionText}>{t('document.more')}</Text>
               </Pressable>
             </View>
           </>
         )}
       </View>
+
+      <ActionSheet
+        visible={actionsVisible}
+        title={document?.title ?? ''}
+        subtitle={t('document.chooseAction')}
+        onClose={() => setActionsVisible(false)}
+        items={[
+          {
+            key: 'print',
+            label: busy === 'print' ? t('document.printingPdf') : t('document.printPdf'),
+            symbol: { ios: 'printer.fill', android: 'print', web: 'print' },
+            onPress: () => void handlePrint(),
+          },
+          {
+            key: 'library',
+            label: t('document.saveToLibrary'),
+            symbol: { ios: 'books.vertical.fill', android: 'library_add', web: 'library_add' },
+            onPress: () => void handleSaveToLibrary(),
+          },
+          {
+            key: 'rename',
+            label: t('document.rename'),
+            symbol: {
+              ios: 'character.cursor.ibeam',
+              android: 'drive_file_rename_outline',
+              web: 'drive_file_rename_outline',
+            },
+            onPress: openNameDialog,
+          },
+          {
+            key: 'edit',
+            label: t('common.edit'),
+            symbol: { ios: 'pencil', android: 'edit', web: 'edit' },
+            onPress: () => router.push(`/document/edit/${document?.id}`),
+          },
+        ]}
+      />
+
+      <Modal
+        visible={nameDialog !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNameDialog(null)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>{t('document.renameTitle')}</Text>
+            <TextInput
+              value={nameValue}
+              onChangeText={setNameValue}
+              placeholder={t('document.namePlaceholder')}
+              placeholderTextColor={colors.textSecondary}
+              autoFocus
+              selectTextOnFocus
+              style={styles.dialogInput}
+              onSubmitEditing={() => void handleNameSubmit()}
+            />
+            <View style={styles.dialogActions}>
+              <PrimaryButton
+                label={t('common.cancel')}
+                variant="secondary"
+                onPress={() => setNameDialog(null)}
+                disabled={savingName}
+              />
+              <PrimaryButton
+                label={t('common.save')}
+                onPress={() => void handleNameSubmit()}
+                loading={savingName}
+                disabled={!nameValue.trim()}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -384,6 +511,23 @@ function createStyles(colors: ThemeColors) {
       gap: 10,
       paddingHorizontal: 16,
     },
+    primaryAction: {
+      flex: 1.35,
+      minHeight: 52,
+      borderRadius: AppDesign.radius.md,
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      ...AppDesign.shadow,
+    },
+    primaryActionText: {
+      color: '#ffffff',
+      fontWeight: '800',
+      fontSize: 15,
+    },
     secondaryAction: {
       flex: 1,
       minHeight: 52,
@@ -402,26 +546,40 @@ function createStyles(colors: ThemeColors) {
       fontWeight: '800',
       fontSize: 15,
     },
-    primaryAction: {
-      flex: 1.15,
-      minHeight: 52,
-      borderRadius: AppDesign.radius.md,
-      backgroundColor: colors.primary,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingHorizontal: 12,
-      ...AppDesign.shadow,
-    },
-    primaryActionText: {
-      color: '#ffffff',
-      fontWeight: '800',
-      fontSize: 15,
-    },
     pressed: {
       opacity: 0.88,
       transform: [{ scale: 0.985 }],
+    },
+    dialogBackdrop: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: 24,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    },
+    dialog: {
+      gap: 16,
+      padding: 20,
+      borderRadius: AppDesign.radius.lg,
+      backgroundColor: colors.surface,
+      ...AppDesign.shadow,
+    },
+    dialogTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: '800',
+    },
+    dialogInput: {
+      minHeight: 50,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: AppDesign.radius.md,
+      backgroundColor: colors.backgroundElement,
+      color: colors.text,
+      fontSize: 16,
+    },
+    dialogActions: {
+      gap: 10,
     },
   });
 }

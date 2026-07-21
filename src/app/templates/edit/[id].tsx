@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,12 +17,15 @@ import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { TemplateFieldsList } from '@/components/template-field-editor';
 import { TemplateIconPicker } from '@/components/template-icon-picker';
 import { LoadingState } from '@/components/ui/loading-state';
+import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { createEmptyField, normalizePdfStyle, normalizeTemplate } from '@/lib/template-helpers';
 import { normalizeTemplateIcon } from '@/lib/template-icon';
 import type { TemplateIcon } from '@/constants/template-icons';
@@ -88,7 +90,7 @@ export default function EditTemplateScreen() {
 
   const removeField = (index: number) => {
     if (fields.length <= 1) {
-      Alert.alert(t('templates.minOneField'));
+      showAppAlert(t('templates.minOneField'));
       return;
     }
     setFields((current) => current.filter((_, itemIndex) => itemIndex !== index));
@@ -98,15 +100,15 @@ export default function EditTemplateScreen() {
     setFields((current) => [...current, createEmptyField(current.map((field) => field.key))]);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (navigateAfterSave = true): Promise<boolean> => {
     if (!template || !title.trim()) {
-      Alert.alert(t('templates.enterTemplateName'));
-      return;
+      showAppAlert(t('templates.enterTemplateName'));
+      return false;
     }
 
     if (fields.some((field) => !field.label.trim())) {
-      Alert.alert(t('templates.allFieldsNeedLabel'));
-      return;
+      showAppAlert(t('templates.allFieldsNeedLabel'));
+      return false;
     }
 
     setSaving(true);
@@ -123,18 +125,43 @@ export default function EditTemplateScreen() {
           pdfStyle,
         })
       );
-      router.back();
+      if (navigateAfterSave) {
+        allowNavigation();
+        router.back();
+      }
+      return true;
     } finally {
       setSaving(false);
     }
   };
+
+  const hasChanges = useMemo(() => {
+    if (!template) {
+      return false;
+    }
+
+    const initialStyle = normalizePdfStyle(template.pdfStyle, template.id);
+    return (
+      title !== template.title ||
+      JSON.stringify(icon) !== JSON.stringify(normalizeTemplateIcon(template)) ||
+      colorPreset.accentColor !== template.accentColor ||
+      colorPreset.gradientEnd !== template.gradientEnd ||
+      JSON.stringify(fields) !== JSON.stringify(template.fields) ||
+      JSON.stringify(pdfStyle) !== JSON.stringify(initialStyle)
+    );
+  }, [colorPreset, fields, icon, pdfStyle, template, title]);
+
+  const allowNavigation = useUnsavedChangesGuard({
+    hasChanges,
+    onSave: () => handleSave(false),
+  });
 
   const handleReset = () => {
     if (!template?.isBuiltIn) {
       return;
     }
 
-    Alert.alert(t('templates.resetTitle'), t('templates.resetText'), [
+    showAppAlert(t('templates.resetTitle'), t('templates.resetText'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('templates.resetAction'),
@@ -166,7 +193,14 @@ export default function EditTemplateScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: `${t('templates.editTitle')} · ${template.title}` }} />
+      <Stack.Screen
+        options={{
+          title: `${t('templates.editTitle')} · ${template.title}`,
+          headerRight: () => (
+            <EditorOverflowMenu onGoHome={() => router.dismissAll()} />
+          ),
+        }}
+      />
       <KeyboardAvoidingView
         style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -244,7 +278,11 @@ export default function EditTemplateScreen() {
           </View>
 
           <View style={styles.actions}>
-            <PrimaryButton label={t('templates.saveChanges')} onPress={handleSave} loading={saving} />
+            <PrimaryButton
+              label={t('templates.saveChanges')}
+              onPress={() => void handleSave()}
+              loading={saving}
+            />
             {template.isBuiltIn ? (
               <PrimaryButton
                 label={t('templates.reset')}

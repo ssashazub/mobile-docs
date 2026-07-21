@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { LanguagePickerModal } from '@/components/ui/language-picker-modal';
 import { SettingsPickerModal } from '@/components/ui/settings-picker-modal';
 import { AppDesign } from '@/constants/app-design';
@@ -126,7 +126,7 @@ export default function SettingsScreen() {
         customExportFolderLabel: picked.label,
       });
     } catch (error) {
-      Alert.alert(
+      showAppAlert(
         t('settings.title'),
         error instanceof Error ? error.message : t('settings.exportFolderChoose')
       );
@@ -145,7 +145,7 @@ export default function SettingsScreen() {
   };
 
   const handleClearDocuments = () => {
-    Alert.alert(t('settings.clearDocumentsConfirmTitle'), t('settings.clearDocumentsConfirmText'), [
+    showAppAlert(t('settings.clearDocumentsConfirmTitle'), t('settings.clearDocumentsConfirmText'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -155,9 +155,9 @@ export default function SettingsScreen() {
             setBusy(true);
             await clearAllDocuments();
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert(t('settings.done'), t('settings.clearDocumentsDone'));
+            showAppAlert(t('settings.done'), t('settings.clearDocumentsDone'));
           } catch (error) {
-            Alert.alert(
+            showAppAlert(
               t('settings.title'),
               error instanceof Error ? error.message : t('settings.clearDocuments')
             );
@@ -170,7 +170,7 @@ export default function SettingsScreen() {
   };
 
   const handleClearCache = () => {
-    Alert.alert(t('settings.clearCacheConfirmTitle'), t('settings.clearCacheConfirmText'), [
+    showAppAlert(t('settings.clearCacheConfirmTitle'), t('settings.clearCacheConfirmText'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('settings.clearCache'),
@@ -179,9 +179,9 @@ export default function SettingsScreen() {
             setBusy(true);
             await clearAppCache();
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert(t('settings.done'), t('settings.clearCacheDone'));
+            showAppAlert(t('settings.done'), t('settings.clearCacheDone'));
           } catch (error) {
-            Alert.alert(
+            showAppAlert(
               t('settings.title'),
               error instanceof Error ? error.message : t('settings.clearCache')
             );
@@ -197,7 +197,7 @@ export default function SettingsScreen() {
     try {
       await openFeedbackEmail();
     } catch {
-      Alert.alert(t('settings.feedback'), APP_FEEDBACK_EMAIL);
+      showAppAlert(t('settings.feedback'), APP_FEEDBACK_EMAIL);
     }
   };
 
@@ -205,7 +205,7 @@ export default function SettingsScreen() {
     try {
       await requestAppReview();
     } catch {
-      Alert.alert(t('settings.rate'), t('settings.rateUnavailable'));
+      showAppAlert(t('settings.rate'), t('settings.rateUnavailable'));
     }
   };
 
@@ -436,7 +436,7 @@ export default function SettingsScreen() {
           {
             key: 'choose',
             label: t('settings.exportFolderChoose'),
-            icon: '📁',
+            symbol: { ios: 'folder.fill', android: 'folder', web: 'folder' },
             onPress: () => {
               void handlePickFolder();
             },
@@ -446,7 +446,7 @@ export default function SettingsScreen() {
                 {
                   key: 'reset',
                   label: t('settings.exportFolderReset'),
-                  icon: '↺',
+                  symbol: { ios: 'arrow.counterclockwise', android: 'refresh', web: 'refresh' },
                   onPress: () => {
                     void handleResetFolder();
                   },

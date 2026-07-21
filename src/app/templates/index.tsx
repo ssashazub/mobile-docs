@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type Href, Stack, router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DocumentTypeCard } from '@/components/document-type-card';
+import { showAppAlert } from '@/components/ui/app-alert';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
@@ -29,7 +30,7 @@ export default function TemplatesScreen() {
   );
 
   const handleDelete = (template: DocumentTemplate) => {
-    Alert.alert(
+    showAppAlert(
       t('templates.deleteConfirmTitle'),
       t('templates.deleteConfirmText', { title: template.title }),
       [

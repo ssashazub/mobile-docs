@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type ComponentProps } from 'react';
 import {
   Animated,
   Modal,
@@ -9,6 +9,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppDesign } from '@/constants/app-design';
@@ -20,6 +21,7 @@ export type ActionSheetItem = {
   key: string;
   label: string;
   icon?: string;
+  symbol?: ComponentProps<typeof SymbolView>['name'];
   tone?: 'default' | 'danger';
   onPress: () => void;
 };
@@ -128,7 +130,15 @@ export function ActionSheet({
                     item.tone === 'danger' ? styles.itemIconDanger : styles.itemIconDefault,
                   ]}
                 >
-                  <Text style={styles.itemIcon}>{item.icon ?? '•'}</Text>
+                  {item.symbol ? (
+                    <SymbolView
+                      name={item.symbol}
+                      size={22}
+                      tintColor={item.tone === 'danger' ? colors.danger : resolvedAccent}
+                    />
+                  ) : (
+                    <Text style={styles.itemIcon}>{item.icon ?? '•'}</Text>
+                  )}
                 </View>
                 <Text
                   style={[
