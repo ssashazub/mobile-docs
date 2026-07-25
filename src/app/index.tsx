@@ -875,6 +875,7 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'space-between',
       gap: 12,
       flexShrink: 0,
+      marginBottom: 8,
     },
     brandBlock: {
       flex: 1,
