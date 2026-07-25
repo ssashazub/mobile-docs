@@ -26,6 +26,7 @@ import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import {
   cloneTemplateFields,
@@ -46,6 +47,7 @@ export default function CreateTemplateScreen() {
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const blank = createBlankTemplate();
 
@@ -183,7 +185,11 @@ export default function CreateTemplateScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={[
+            styles.content,
+            layout.contentStyle,
+            { paddingBottom: insets.bottom + 24 },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

@@ -1,5 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { AppDesign } from '@/constants/app-design';
@@ -8,6 +14,9 @@ import { useTheme } from '@/hooks/use-theme';
 
 type FormFieldProps = TextInputProps & {
   label: string;
+  required?: boolean;
+  error?: boolean;
+  shakeToken?: number;
 };
 
 const multilingualDefaults: Partial<TextInputProps> = {
@@ -20,26 +29,76 @@ const multilingualDefaults: Partial<TextInputProps> = {
   importantForAutofill: 'no',
 };
 
-export function FormField({ label, style, onFocus, onBlur, ...inputProps }: FormFieldProps) {
+export function FormField({
+  label,
+  required = false,
+  error = false,
+  shakeToken = 0,
+  style,
+  value,
+  onFocus,
+  onBlur,
+  ...inputProps
+}: FormFieldProps) {
   const colors = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [focused, setFocused] = useState(false);
+  const shake = useSharedValue(0);
+
+  const emptyRequired = required && !(typeof value === 'string' ? value.trim() : value);
+  const showError = error || emptyRequired;
+
+  useEffect(() => {
+    if (!shakeToken) {
+      return;
+    }
+
+    shake.value = withSequence(
+      withTiming(-10, { duration: 45 }),
+      withTiming(10, { duration: 45 }),
+      withTiming(-8, { duration: 45 }),
+      withTiming(8, { duration: 45 }),
+      withTiming(-4, { duration: 40 }),
+      withTiming(0, { duration: 40 })
+    );
+  }, [shake, shakeToken]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shake.value }],
+  }));
 
   return (
-    <View style={styles.field}>
-      <ThemedText type="smallBold" themeColor="textSecondary" style={styles.label}>
-        {label}
-      </ThemedText>
+    <Animated.View style={[styles.field, animatedStyle]}>
+      <View style={styles.labelRow}>
+        <ThemedText
+          type="smallBold"
+          themeColor={showError ? 'danger' : 'textSecondary'}
+          style={styles.label}
+        >
+          {label}
+        </ThemedText>
+        {required ? (
+          <ThemedText type="smallBold" themeColor="danger" style={styles.requiredMark}>
+            *
+          </ThemedText>
+        ) : null}
+      </View>
       <TextInput
         placeholderTextColor={colors.textMuted}
+        value={value}
         style={[
           styles.input,
           {
             color: colors.text,
             backgroundColor: colors.backgroundElement,
-            borderColor: focused ? colors.primary : colors.border,
+            borderColor: showError
+              ? colors.danger
+              : focused
+                ? colors.primary
+                : colors.border,
           },
-          focused && styles.inputFocused,
+          focused && !showError && styles.inputFocused,
+          showError && styles.inputError,
           style,
         ]}
         {...multilingualDefaults}
@@ -53,7 +112,7 @@ export function FormField({ label, style, onFocus, onBlur, ...inputProps }: Form
           onBlur?.(event);
         }}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -62,8 +121,17 @@ function createStyles(colors: ThemeColors) {
     field: {
       gap: Spacing.one,
     },
-    label: {
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
       marginLeft: Spacing.one,
+    },
+    label: {
+      marginLeft: 0,
+    },
+    requiredMark: {
+      lineHeight: 18,
     },
     input: {
       borderWidth: 1.5,
@@ -76,6 +144,13 @@ function createStyles(colors: ThemeColors) {
     inputFocused: {
       shadowColor: colors.primary,
       shadowOpacity: 0.18,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 2,
+    },
+    inputError: {
+      shadowColor: colors.danger,
+      shadowOpacity: 0.2,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 2 },
       elevation: 2,

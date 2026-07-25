@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { getAppSettings, updateAppSettings } from '@/lib/app-settings-storage';
+import { setHapticsEnabled } from '@/lib/haptics';
 import { DEFAULT_APP_SETTINGS, type AppSettings } from '@/types/app-settings';
 
 type AppSettingsContextValue = {
@@ -26,6 +27,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   const refreshSettings = useCallback(async () => {
     const next = await getAppSettings();
+    setHapticsEnabled(next.hapticsEnabled);
     setSettings(next);
   }, []);
 
@@ -37,6 +39,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      setHapticsEnabled(stored.hapticsEnabled);
       setSettings(stored);
       setIsHydrated(true);
     });
@@ -48,6 +51,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback(async (patch: Partial<AppSettings>) => {
     const next = await updateAppSettings(patch);
+    setHapticsEnabled(next.hapticsEnabled);
     setSettings(next);
     return next;
   }, []);

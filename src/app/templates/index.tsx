@@ -9,6 +9,7 @@ import { showAppAlert } from '@/components/ui/app-alert';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteTemplate, getTemplates } from '@/lib/template-storage';
 import type { DocumentTemplate } from '@/types/template';
@@ -16,6 +17,7 @@ import type { DocumentTemplate } from '@/types/template';
 export default function TemplatesScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
 
@@ -51,37 +53,51 @@ export default function TemplatesScreen() {
     <>
       <Stack.Screen options={{ title: t('templates.title') }} />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.container, layout.listContentStyle]}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.heading}>{t('templates.heading')}</Text>
           <Text style={styles.subheading}>{t('templates.subtitle')}</Text>
 
-          <Pressable
-            style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}
-            onPress={() => router.push('/templates/create' as Href)}
-          >
-            <View style={styles.createTitleRow}>
-              <SymbolView
-                name={{ ios: 'plus', android: 'add', web: 'add' }}
-                size={18}
-                tintColor="#ffffff"
-                weight="semibold"
-              />
-              <Text style={styles.createTitle}>{t('templates.createTemplate')}</Text>
-            </View>
-            <Text style={styles.createSubtitle}>{t('templates.createSubtitle')}</Text>
-          </Pressable>
+          <View style={[styles.actionsRow, layout.isTablet && styles.actionsRowTablet]}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.createButton,
+                layout.isTablet && styles.actionHalf,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => router.push('/templates/create' as Href)}
+            >
+              <View style={styles.createTitleRow}>
+                <SymbolView
+                  name={{ ios: 'plus', android: 'add', web: 'add' }}
+                  size={18}
+                  tintColor="#ffffff"
+                  weight="semibold"
+                />
+                <Text style={styles.createTitle}>{t('templates.createTemplate')}</Text>
+              </View>
+              <Text style={styles.createSubtitle}>{t('templates.createSubtitle')}</Text>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.createButton, styles.secondaryButton, pressed && styles.pressed]}
-            onPress={() => router.push('/pdf-styles' as Href)}
-          >
-            <Text style={styles.secondaryTitle}>{t('pdfStyle.manageTitle')}</Text>
-            <Text style={styles.secondarySubtitle}>{t('pdfStyle.manageSubtitle')}</Text>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.createButton,
+                styles.secondaryButton,
+                layout.isTablet && styles.actionHalf,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => router.push('/pdf-styles' as Href)}
+            >
+              <Text style={styles.secondaryTitle}>{t('pdfStyle.manageTitle')}</Text>
+              <Text style={styles.secondarySubtitle}>{t('pdfStyle.manageSubtitle')}</Text>
+            </Pressable>
+          </View>
 
-          <View style={styles.list}>
+          <View style={[styles.list, layout.gridStyle]}>
             {templates.map((template) => (
-              <View key={template.id} style={styles.itemWrap}>
+              <View key={template.id} style={[styles.itemWrap, layout.gridItemStyle]}>
                 <DocumentTypeCard
                   template={template}
                   onPress={() => router.push(`/templates/edit/${template.id}` as Href)}
@@ -130,6 +146,15 @@ function createStyles(colors: ThemeColors) {
       padding: 18,
       gap: 4,
       ...AppDesign.shadow,
+    },
+    actionsRow: {
+      gap: 14,
+    },
+    actionsRowTablet: {
+      flexDirection: 'row',
+    },
+    actionHalf: {
+      flex: 1,
     },
     createTitleRow: {
       flexDirection: 'row',

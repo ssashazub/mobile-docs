@@ -9,6 +9,7 @@ export type AppSettings = {
   /** Short label for UI (folder name) */
   customExportFolderLabel: string | null;
   fileNameFormat: ExportFileNameFormat;
+  hapticsEnabled: boolean;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -16,6 +17,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   customExportFolderUri: null,
   customExportFolderLabel: null,
   fileNameFormat: 'title',
+  hapticsEnabled: true,
 };
 
 export const FILE_NAME_FORMATS: ExportFileNameFormat[] = [

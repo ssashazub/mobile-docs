@@ -83,6 +83,7 @@ export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCard
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
+      width: '100%',
       backgroundColor: colors.surface,
       borderRadius: AppDesign.radius.lg,
       borderWidth: 1,

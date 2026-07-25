@@ -29,9 +29,12 @@ import { validatePdfFormFields, validateTemplateFields } from '@/lib/field-valid
 import { normalizePdfStyle } from '@/lib/template-helpers';
 import { getTemplateById } from '@/lib/template-storage';
 import { Spacing, type ThemeColors } from '@/constants/theme';
+import { useFieldFocusOnError } from '@/hooks/use-field-focus-on-error';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import * as Haptics from '@/lib/haptics';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate, PdfStyle } from '@/types/template';
 
@@ -49,6 +52,7 @@ function parseDocumentId(id: string | string[] | undefined): number | null {
 export default function EditDocumentScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const documentId = parseDocumentId(id);
@@ -61,6 +65,15 @@ export default function EditDocumentScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const {
+    scrollRef,
+    errorFieldKey,
+    shakeToken,
+    setFormLayoutY,
+    setFieldLayoutY,
+    clearFieldError,
+    focusInvalidField,
+  } = useFieldFocusOnError();
 
   useFocusEffect(
     useCallback(() => {
@@ -134,6 +147,7 @@ export default function EditDocumentScreen() {
   );
 
   const updateField = (key: string, value: string) => {
+    clearFieldError(key);
     setFields((current) => ({ ...current, [key]: value }));
   };
 
@@ -157,16 +171,28 @@ export default function EditDocumentScreen() {
       const validationError = validatePdfFormFields(document.formFields, fields);
 
       if (validationError) {
-        const alert = getFieldValidationAlert(validationError, t);
-        showAppAlert(alert.title, alert.message);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        focusInvalidField(validationError);
+
+        if (validationError.messageKey !== 'required') {
+          const alert = getFieldValidationAlert(validationError, t);
+          showAppAlert(alert.title, alert.message);
+        }
+
         return false;
       }
     } else if (template) {
       const validationError = validateTemplateFields(template.fields, fields);
 
       if (validationError) {
-        const alert = getFieldValidationAlert(validationError, t);
-        showAppAlert(alert.title, alert.message);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        focusInvalidField(validationError);
+
+        if (validationError.messageKey !== 'required') {
+          const alert = getFieldValidationAlert(validationError, t);
+          showAppAlert(alert.title, alert.message);
+        }
+
         return false;
       }
     }
@@ -260,9 +286,6 @@ export default function EditDocumentScreen() {
 
   const display = getDocumentDisplayInfo(document, template);
   const isFormImport = isImportedFormDocument(document);
-  const canSave = isFormImport
-    ? Object.values(fields).some((value) => value.trim().length > 0)
-    : Boolean(fields.title?.trim());
 
   return (
     <>
@@ -285,8 +308,10 @@ export default function EditDocumentScreen() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={[
               styles.content,
+              layout.contentStyle,
               { paddingBottom: insets.bottom + Spacing.four },
             ]}
             keyboardShouldPersistTaps="handled"
@@ -320,30 +345,50 @@ export default function EditDocumentScreen() {
               />
             ) : null}
 
-            <View style={styles.form}>
+            <View
+              style={styles.form}
+              onLayout={(event) => setFormLayoutY(event.nativeEvent.layout.y)}
+            >
               {isFormImport && document.formFields
                 ? document.formFields.map((field) => (
-                    <PdfFormFieldInput
+                    <View
                       key={field.name}
-                      field={field}
-                      value={fields[field.name] ?? ''}
-                      onChange={(value) => updateField(field.name, value)}
-                    />
+                      onLayout={(event) =>
+                        setFieldLayoutY(field.name, event.nativeEvent.layout.y)
+                      }
+                    >
+                      <PdfFormFieldInput
+                        field={field}
+                        value={fields[field.name] ?? ''}
+                        onChange={(value) => updateField(field.name, value)}
+                        error={errorFieldKey === field.name}
+                        shakeToken={errorFieldKey === field.name ? shakeToken : 0}
+                      />
+                    </View>
                   ))
                 : display.fields.map((field) => (
-                    <ValidatedFormField
+                    <View
                       key={field.key}
-                      fieldKey={field.key}
-                      kind={field.kind}
-                      label={field.label}
-                      value={fields[field.key] ?? ''}
-                      onChangeText={(value) => updateField(field.key, value)}
-                      placeholder={field.placeholder}
-                      multiline={field.multiline}
-                      numberOfLines={field.multiline ? 4 : 1}
-                      textAlignVertical={field.multiline ? 'top' : 'center'}
-                      style={field.multiline ? styles.descriptionInput : undefined}
-                    />
+                      onLayout={(event) =>
+                        setFieldLayoutY(field.key, event.nativeEvent.layout.y)
+                      }
+                    >
+                      <ValidatedFormField
+                        fieldKey={field.key}
+                        kind={field.kind}
+                        label={field.label}
+                        value={fields[field.key] ?? ''}
+                        required={field.required}
+                        error={errorFieldKey === field.key}
+                        shakeToken={errorFieldKey === field.key ? shakeToken : 0}
+                        onChangeText={(value) => updateField(field.key, value)}
+                        placeholder={field.placeholder}
+                        multiline={field.multiline}
+                        numberOfLines={field.multiline ? 4 : 1}
+                        textAlignVertical={field.multiline ? 'top' : 'center'}
+                        style={field.multiline ? styles.descriptionInput : undefined}
+                      />
+                    </View>
                   ))}
             </View>
 
@@ -352,7 +397,6 @@ export default function EditDocumentScreen() {
                 label={t('common.save')}
                 onPress={() => void saveDocument()}
                 loading={saving}
-                disabled={!canSave}
               />
               <PrimaryButton
                 label={t('common.cancel')}

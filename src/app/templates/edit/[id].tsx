@@ -25,6 +25,7 @@ import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { createEmptyField, normalizePdfStyle, normalizeTemplate } from '@/lib/template-helpers';
 import { normalizeTemplateIcon } from '@/lib/template-icon';
@@ -37,6 +38,7 @@ export default function EditTemplateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [template, setTemplate] = useState<DocumentTemplate | null>(null);
@@ -207,7 +209,11 @@ export default function EditTemplateScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         <ScrollView
-          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          contentContainerStyle={[
+            styles.content,
+            layout.contentStyle,
+            { paddingBottom: insets.bottom + 24 },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

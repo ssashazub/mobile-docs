@@ -88,8 +88,12 @@ export function useThemePreference() {
 }
 
 export function useResolvedColorScheme(): 'light' | 'dark' {
-  const { preference } = useThemePreference();
+  const { preference, isHydrated } = useThemePreference();
   const systemScheme = useRNColorScheme();
+
+  if (!isHydrated) {
+    return 'light';
+  }
 
   return resolveColorScheme(preference, systemScheme);
 }

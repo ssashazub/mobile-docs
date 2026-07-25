@@ -21,9 +21,12 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
+import { useFieldFocusOnError } from '@/hooks/use-field-focus-on-error';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import * as Haptics from '@/lib/haptics';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
@@ -36,6 +39,7 @@ import type { DocumentTemplate, PdfStyle } from '@/types/template';
 export default function CreateDocumentFormScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { templateId } = useLocalSearchParams<{ templateId: string }>();
   const insets = useSafeAreaInsets();
@@ -45,6 +49,15 @@ export default function CreateDocumentFormScreen() {
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>(normalizePdfStyle(undefined));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const {
+    scrollRef,
+    errorFieldKey,
+    shakeToken,
+    setFormLayoutY,
+    setFieldLayoutY,
+    clearFieldError,
+    focusInvalidField,
+  } = useFieldFocusOnError();
 
   const loadTemplate = useCallback(async () => {
     if (!templateId) {
@@ -74,6 +87,7 @@ export default function CreateDocumentFormScreen() {
   );
 
   const updateField = (key: string, value: string) => {
+    clearFieldError(key);
     setFields((current) => ({ ...current, [key]: value }));
   };
 
@@ -96,8 +110,14 @@ export default function CreateDocumentFormScreen() {
     const validationError = validateTemplateFields(template.fields, fields);
 
     if (validationError) {
-      const alert = getFieldValidationAlert(validationError, t);
-      showAppAlert(alert.title, alert.message);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      focusInvalidField(validationError);
+
+      if (validationError.messageKey !== 'required') {
+        const alert = getFieldValidationAlert(validationError, t);
+        showAppAlert(alert.title, alert.message);
+      }
+
       return false;
     }
 
@@ -183,8 +203,10 @@ export default function CreateDocumentFormScreen() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.content,
+            layout.contentStyle,
             { paddingBottom: insets.bottom + 24 },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -217,21 +239,31 @@ export default function CreateDocumentFormScreen() {
             onChange={setPdfStyle}
           />
 
-          <View style={styles.form}>
+          <View
+            style={styles.form}
+            onLayout={(event) => setFormLayoutY(event.nativeEvent.layout.y)}
+          >
             {fieldList.map((field) => (
-              <ValidatedFormField
+              <View
                 key={field.key}
-                fieldKey={field.key}
-                kind={field.kind}
-                label={field.label}
-                value={fields[field.key] ?? ''}
-                onChangeText={(value) => updateField(field.key, value)}
-                placeholder={field.placeholder}
-                multiline={field.multiline}
-                numberOfLines={field.multiline ? 4 : 1}
-                textAlignVertical={field.multiline ? 'top' : 'center'}
-                style={field.multiline ? styles.multiline : undefined}
-              />
+                onLayout={(event) => setFieldLayoutY(field.key, event.nativeEvent.layout.y)}
+              >
+                <ValidatedFormField
+                  fieldKey={field.key}
+                  kind={field.kind}
+                  label={field.label}
+                  value={fields[field.key] ?? ''}
+                  required={field.required}
+                  error={errorFieldKey === field.key}
+                  shakeToken={errorFieldKey === field.key ? shakeToken : 0}
+                  onChangeText={(value) => updateField(field.key, value)}
+                  placeholder={field.placeholder}
+                  multiline={field.multiline}
+                  numberOfLines={field.multiline ? 4 : 1}
+                  textAlignVertical={field.multiline ? 'top' : 'center'}
+                  style={field.multiline ? styles.multiline : undefined}
+                />
+              </View>
             ))}
           </View>
 

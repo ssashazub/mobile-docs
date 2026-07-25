@@ -1,13 +1,19 @@
+import { useEffect, type ReactNode } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 
 import { AppAlertProvider } from '@/components/ui/app-alert';
-import { AppSettingsProvider } from '@/contexts/app-settings-context';
-import { LocalePreferenceProvider } from '@/contexts/locale-preference-context';
-import { ThemePreferenceProvider } from '@/contexts/theme-preference-context';
+import { AppSettingsProvider, useAppSettings } from '@/contexts/app-settings-context';
+import { LocalePreferenceProvider, useLocalePreference } from '@/contexts/locale-preference-context';
+import { ThemePreferenceProvider, useThemePreference } from '@/contexts/theme-preference-context';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Splash may already be hidden in some environments (web / fast refresh).
+});
 
 function RootNavigator() {
   const colorScheme = useColorScheme();
@@ -41,14 +47,37 @@ function RootNavigator() {
   );
 }
 
+function AppBootstrap({ children }: { children: ReactNode }) {
+  const { isHydrated: themeReady } = useThemePreference();
+  const { isHydrated: localeReady } = useLocalePreference();
+  const { isHydrated: settingsReady } = useAppSettings();
+  const ready = themeReady && localeReady && settingsReady;
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+
+    void SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) {
+    return null;
+  }
+
+  return children;
+}
+
 export default function RootLayout() {
   return (
     <ThemePreferenceProvider>
       <LocalePreferenceProvider>
         <AppSettingsProvider>
-          <AppAlertProvider>
-            <RootNavigator />
-          </AppAlertProvider>
+          <AppBootstrap>
+            <AppAlertProvider>
+              <RootNavigator />
+            </AppAlertProvider>
+          </AppBootstrap>
         </AppSettingsProvider>
       </LocalePreferenceProvider>
     </ThemePreferenceProvider>

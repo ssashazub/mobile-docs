@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import Animated, {
   Extrapolation,
   interpolate,

@@ -257,6 +257,7 @@ export type TranslationSchema = {
     languageUk: string;
     languageHint: string;
     appearance: string;
+    haptics: string;
     exportFolder: string;
     exportFolderApp: string;
     exportFolderCustom: string;

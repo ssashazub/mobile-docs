@@ -13,6 +13,8 @@ type PdfFormFieldInputProps = {
   field: PdfFormField;
   value: string;
   onChange: (value: string) => void;
+  error?: boolean;
+  shakeToken?: number;
 };
 
 function OptionPicker({
@@ -71,7 +73,13 @@ function OptionPicker({
   );
 }
 
-export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputProps) {
+export function PdfFormFieldInput({
+  field,
+  value,
+  onChange,
+  error,
+  shakeToken,
+}: PdfFormFieldInputProps) {
   const colors = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -128,6 +136,8 @@ export function PdfFormFieldInput({ field, value, onChange }: PdfFormFieldInputP
       label={field.label}
       value={value}
       onChangeText={onChange}
+      error={error}
+      shakeToken={shakeToken}
       multiline={field.type === 'text' && value.length > 80}
       numberOfLines={field.type === 'text' && value.length > 80 ? 4 : 1}
       textAlignVertical={field.type === 'text' && value.length > 80 ? 'top' : 'center'}

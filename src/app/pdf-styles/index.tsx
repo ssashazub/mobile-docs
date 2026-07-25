@@ -8,6 +8,7 @@ import { showAppAlert } from '@/components/ui/app-alert';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import { deletePdfStyle, getSavedPdfStyles } from '@/lib/pdf-style-storage';
 import { getPdfLayoutLabelKey } from '@/lib/pdf-layout-labels';
 import type { SavedPdfStyle } from '@/types/pdf-style-design';
@@ -15,6 +16,7 @@ import type { SavedPdfStyle } from '@/types/pdf-style-design';
 export default function PdfStylesScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const stylesScreen = useMemo(() => createStyles(colors), [colors]);
   const [styles, setStyles] = useState<SavedPdfStyle[]>([]);
 
@@ -50,7 +52,10 @@ export default function PdfStylesScreen() {
     <>
       <Stack.Screen options={{ title: t('pdfStyle.manageTitle') }} />
       <SafeAreaView style={stylesScreen.safeArea} edges={['bottom']}>
-        <ScrollView contentContainerStyle={stylesScreen.container} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[stylesScreen.container, layout.listContentStyle]}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={stylesScreen.heading}>{t('pdfStyle.manageHeading')}</Text>
           <Text style={stylesScreen.subheading}>{t('pdfStyle.manageSubtitle')}</Text>
 
@@ -60,9 +65,9 @@ export default function PdfStylesScreen() {
               <Text style={stylesScreen.emptyText}>{t('pdfStyle.emptyText')}</Text>
             </View>
           ) : (
-            <View style={stylesScreen.list}>
+            <View style={[stylesScreen.list, layout.gridStyle]}>
               {styles.map((style) => (
-                <View key={style.id} style={stylesScreen.card}>
+                <View key={style.id} style={[stylesScreen.card, layout.gridItemStyle]}>
                   <View style={stylesScreen.cardHeader}>
                     <View
                       style={[

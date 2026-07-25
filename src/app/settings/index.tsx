@@ -4,13 +4,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, router, Stack } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
@@ -25,6 +26,7 @@ import { useLocalePreference } from '@/contexts/locale-preference-context';
 import { useThemePreference } from '@/contexts/theme-preference-context';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import { getAppVersion, openFeedbackEmail, requestAppReview } from '@/lib/about-actions';
 import { clearAppCache } from '@/lib/clear-cache';
 import { clearAllDocuments } from '@/lib/clear-documents';
@@ -90,6 +92,7 @@ const FILE_NAME_OPTIONS: {
 export default function SettingsScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { preference, setPreference } = useLocalePreference();
   const { preference: themePreference, setPreference: setThemePreference } = useThemePreference();
@@ -212,7 +215,10 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen options={{ title: t('settings.title') }} />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.container, layout.contentStyle]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.hero}>
           <LinearGradient
             colors={['#6366f1', '#4f46e5', '#4338ca']}
@@ -288,6 +294,32 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.staticRow}>
+            <View style={styles.rowIcon}>
+              <SymbolView
+                name={{ ios: 'iphone.radiowaves.left.and.right', android: 'vibration', web: 'vibration' }}
+                size={18}
+                tintColor={colors.primary}
+              />
+            </View>
+            <Text style={styles.rowLabel}>{t('settings.haptics')}</Text>
+            <Switch
+              value={settings.hapticsEnabled}
+              onValueChange={(hapticsEnabled) => {
+                if (settings.hapticsEnabled && !hapticsEnabled) {
+                  void Haptics.selectionAsync();
+                }
+                void updateSettings({ hapticsEnabled }).then(() => {
+                  if (hapticsEnabled) {
+                    void Haptics.selectionAsync();
+                  }
+                });
+              }}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={settings.hapticsEnabled ? '#ffffff' : colors.backgroundElement}
+            />
           </View>
         </SettingsGroup>
 

@@ -9,6 +9,7 @@ import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { getTemplates } from '@/lib/template-storage';
 import type { DocumentTemplate } from '@/types/template';
@@ -16,6 +17,7 @@ import type { DocumentTemplate } from '@/types/template';
 export default function CreateDocumentTypeScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
 
@@ -40,7 +42,10 @@ export default function CreateDocumentTypeScreen() {
         }}
       />
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.container, layout.listContentStyle]}
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.heading}>{t('create.chooseTemplate')}</Text>
           <Text style={styles.subheading}>{t('create.chooseSubtitle')}</Text>
 
@@ -60,14 +65,15 @@ export default function CreateDocumentTypeScreen() {
             <Text style={styles.manageSubtitle}>{t('create.manageSubtitle')}</Text>
           </Pressable>
 
-          <View style={styles.list}>
+          <View style={[styles.list, layout.gridStyle]}>
             {templates.map((template) => (
-              <DocumentTypeCard
-                key={template.id}
-                template={template}
-                onPress={() => router.push(`/create/${template.id}` as Href)}
-                onEdit={() => router.push(`/templates/edit/${template.id}` as Href)}
-              />
+              <View key={template.id} style={layout.gridItemStyle}>
+                <DocumentTypeCard
+                  template={template}
+                  onPress={() => router.push(`/create/${template.id}` as Href)}
+                  onEdit={() => router.push(`/templates/edit/${template.id}` as Href)}
+                />
+              </View>
             ))}
           </View>
         </ScrollView>

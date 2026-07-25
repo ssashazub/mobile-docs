@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ComponentProps } from 'react';
+import { useMemo, type ComponentProps } from 'react';
 import {
   Animated,
   Modal,
@@ -13,8 +13,11 @@ import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppDesign } from '@/constants/app-design';
+import { Layout } from '@/constants/layout';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
+import { useModalSheetAnimation } from '@/hooks/use-modal-sheet-animation';
 import { useTheme } from '@/hooks/use-theme';
 
 export type ActionSheetItem = {
@@ -47,47 +50,15 @@ export function ActionSheet({
 }: ActionSheetProps) {
   const { t } = useI18n();
   const colors = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const layout = useLayout();
+  const styles = useMemo(() => createStyles(colors, layout.isTablet), [colors, layout.isTablet]);
   const resolvedAccent = accentColor ?? colors.primary;
   const insets = useSafeAreaInsets();
-  const backdrop = useRef(new Animated.Value(0)).current;
-  const sheet = useRef(new Animated.Value(320)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(backdrop, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-        Animated.spring(sheet, {
-          toValue: 0,
-          damping: 22,
-          stiffness: 240,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      return;
-    }
-
-    Animated.parallel([
-      Animated.timing(backdrop, {
-        toValue: 0,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheet, {
-        toValue: 320,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [visible, backdrop, sheet]);
+  const { backdrop, sheet } = useModalSheetAnimation(visible, 320);
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, layout.isTablet && styles.overlayTablet]}>
         <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         </Animated.View>
@@ -95,7 +66,11 @@ export function ActionSheet({
         <Animated.View
           style={[
             styles.sheet,
-            { paddingBottom: insets.bottom + 16, transform: [{ translateY: sheet }] },
+            layout.isTablet && styles.sheetTablet,
+            {
+              paddingBottom: layout.isTablet ? 20 : insets.bottom + 16,
+              transform: [{ translateY: sheet }],
+            },
           ]}
         >
           <View style={styles.handle} />
@@ -164,11 +139,16 @@ export function ActionSheet({
   );
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles(colors: ThemeColors, isTablet: boolean) {
   return StyleSheet.create({
     overlay: {
       flex: 1,
       justifyContent: 'flex-end',
+    },
+    overlayTablet: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24,
     },
     backdrop: {
       ...StyleSheet.absoluteFill,
@@ -180,14 +160,22 @@ function createStyles(colors: ThemeColors) {
       borderTopRightRadius: AppDesign.radius.xl,
       paddingHorizontal: 20,
       paddingTop: 10,
+      width: '100%',
+    },
+    sheetTablet: {
+      maxWidth: Layout.sheetMaxWidth,
+      borderRadius: AppDesign.radius.xl,
+      borderTopLeftRadius: AppDesign.radius.xl,
+      borderTopRightRadius: AppDesign.radius.xl,
+      ...AppDesign.shadow,
     },
     handle: {
       alignSelf: 'center',
-      width: 44,
-      height: 5,
+      width: isTablet ? 0 : 44,
+      height: isTablet ? 0 : 5,
       borderRadius: 999,
       backgroundColor: colors.border,
-      marginBottom: 16,
+      marginBottom: isTablet ? 8 : 16,
     },
     header: {
       flexDirection: 'row',

@@ -8,6 +8,7 @@ import { DocumentCard } from '@/components/document-card';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { resolveTemplateForDocument } from '@/lib/document-display';
 import { deleteDocument as deleteStoredDocument, getDocuments } from '@/lib/document-storage';
@@ -24,6 +25,7 @@ function sortDocumentsNewestFirst(documents: Document[]): Document[] {
 export default function DocumentsScreen() {
   const { t, pluralDocuments } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -62,7 +64,10 @@ export default function DocumentsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen options={{ title: t('home.listTitle') }} />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.container, layout.listContentStyle]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.subtitle}>
           {documents.length} {pluralDocuments(documents.length)}
         </Text>
@@ -73,18 +78,19 @@ export default function DocumentsScreen() {
             <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
           </View>
         ) : (
-          <View style={styles.list}>
+          <View style={[styles.list, layout.gridStyle]}>
             {documents.map((doc) => {
               const template = resolveTemplateForDocument(doc, templatesMap);
 
               return (
-                <DocumentCard
-                  key={doc.id}
-                  document={doc}
-                  template={template}
-                  onPress={() => router.push(`/document/${doc.id}`)}
-                  onLongPress={() => setSelectedDocument(doc)}
-                />
+                <View key={doc.id} style={layout.gridItemStyle}>
+                  <DocumentCard
+                    document={doc}
+                    template={template}
+                    onPress={() => router.push(`/document/${doc.id}`)}
+                    onLongPress={() => setSelectedDocument(doc)}
+                  />
+                </View>
               );
             })}
           </View>

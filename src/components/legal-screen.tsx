@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
+import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 
 type LegalSection = {
@@ -22,12 +23,16 @@ type LegalScreenProps = {
 
 export function LegalScreen({ title, intro, sections, bullets, children }: LegalScreenProps) {
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <Stack.Screen options={{ title }} />
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.container, layout.contentStyle]}
+        showsVerticalScrollIndicator={false}
+      >
         {intro ? <Text style={styles.intro}>{intro}</Text> : null}
 
         {sections?.map((section) => (
@@ -87,25 +92,25 @@ function createStyles(colors: ThemeColors) {
     },
     body: {
       fontSize: 14,
-      lineHeight: 22,
+      lineHeight: 21,
       color: colors.textSecondary,
     },
     bulletRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
       gap: 10,
+      alignItems: 'flex-start',
     },
     bulletDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: colors.primary,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
       marginTop: 7,
+      backgroundColor: colors.primary,
     },
     bulletText: {
       flex: 1,
       fontSize: 14,
-      lineHeight: 22,
+      lineHeight: 21,
       color: colors.textSecondary,
     },
   });

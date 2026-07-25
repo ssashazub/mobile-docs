@@ -1,24 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useColorScheme as useRNColorScheme } from 'react-native';
 
-import { useThemePreference } from '@/contexts/theme-preference-context';
+import { useResolvedColorScheme } from '@/contexts/theme-preference-context';
 
 export function useColorScheme(): 'light' | 'dark' {
-  const { preference, isHydrated } = useThemePreference();
+  const scheme = useResolvedColorScheme();
   const [hasHydrated, setHasHydrated] = useState(false);
-  const systemScheme = useRNColorScheme();
 
   useEffect(() => {
     setHasHydrated(true);
   }, []);
 
-  if (!isHydrated || !hasHydrated) {
+  // Avoid SSR/first-paint mismatch on web.
+  if (!hasHydrated) {
     return 'light';
   }
 
-  if (preference === 'system') {
-    return systemScheme === 'dark' ? 'dark' : 'light';
-  }
-
-  return preference;
+  return scheme;
 }

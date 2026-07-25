@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -100,6 +100,7 @@ export function DocumentCard({
 function createStyles(colors: ThemeColors, compact: boolean) {
   return StyleSheet.create({
     card: {
+      width: '100%',
       flexDirection: 'row',
       backgroundColor: colors.surface,
       borderRadius: AppDesign.radius.lg,

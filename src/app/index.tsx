@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { type Href, router, useFocusEffect } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/lib/haptics';
 import Animated, {
   Easing,
   FadeInDown,
@@ -30,6 +30,7 @@ import { AppDesign } from '@/constants/app-design';
 import { Colors, type ThemeColors } from '@/constants/theme';
 import { getBuiltinTemplates } from '@/core/templates/registry';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { resolveTemplateForDocument } from '@/lib/document-display';
 import { deleteDocument as deleteStoredDocument, getDocuments } from '@/lib/document-storage';
@@ -86,20 +87,31 @@ function ScalePressable({
 export default function HomeScreen() {
   const { t, pluralDocuments, locale } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [importing, setImporting] = useState(false);
+  const [tabletMainHeight, setTabletMainHeight] = useState(0);
+  const [docsHeaderHeight, setDocsHeaderHeight] = useState(0);
+  const [docsContentHeight, setDocsContentHeight] = useState(0);
 
-  const recentDocuments = useMemo(
-    () =>
-      [...documents]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 3),
-    [documents]
-  );
-  const hasMoreDocuments = documents.length > 3;
+  const recentDocuments = useMemo(() => {
+    const sorted = [...documents].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return layout.isTablet ? sorted : sorted.slice(0, 3);
+  }, [documents, layout.isTablet]);
+  const hasMoreDocuments = !layout.isTablet && documents.length > 3;
+  const tabletDocsViewportHeight =
+    tabletMainHeight > 0 ? Math.max(120, tabletMainHeight - docsHeaderHeight - 40) : 0;
+  const tabletDocumentsOverflow =
+    layout.isTablet &&
+    documents.length > 0 &&
+    tabletDocsViewportHeight > 0 &&
+    docsContentHeight > tabletDocsViewportHeight + 1;
+  const showViewAllDocuments = hasMoreDocuments || tabletDocumentsOverflow;
 
   const templatesMap = useMemo(
     () => Object.fromEntries(templates.map((template) => [template.id, template])),
@@ -150,176 +162,389 @@ export default function HomeScreen() {
     }
   };
 
+  const brandBar = (
+    <Animated.View entering={FadeInDown.duration(420).springify()} style={styles.topBar}>
+      <View style={styles.brandBlock}>
+        <LinearGradient
+          colors={['#6366f1', '#4f46e5']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.brandMark}
+        >
+          <SymbolView
+            name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }}
+            size={18}
+            tintColor="#fff"
+          />
+        </LinearGradient>
+        <View style={styles.brandText}>
+          <Text style={styles.brandName}>Mobile Docs</Text>
+          <Text style={styles.brandMeta}>
+            {documents.length} {pluralDocuments(documents.length)}
+          </Text>
+        </View>
+      </View>
+
+      <ScalePressable
+        onPress={() => router.push('/settings' as Href)}
+        style={styles.iconButton}
+      >
+        <SymbolView
+          name={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' }}
+          size={22}
+          tintColor={colors.primary}
+          weight="semibold"
+        />
+      </ScalePressable>
+    </Animated.View>
+  );
+
+  const documentsHeader = (
+    <View
+      style={styles.listHeaderTablet}
+      onLayout={(event) => {
+        setDocsHeaderHeight(event.nativeEvent.layout.height);
+      }}
+    >
+      <Text style={styles.listTitle}>{t('home.listTitle')}</Text>
+      {showViewAllDocuments ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('home.viewAll')}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/documents' as Href);
+          }}
+          style={({ pressed }) => [styles.viewAllButton, pressed && styles.viewAllPressed]}
+        >
+          <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
+          <View style={styles.viewAllCount}>
+            <Text style={styles.viewAllCountText}>{documents.length}</Text>
+          </View>
+          <SymbolView
+            name={{
+              ios: 'chevron.right',
+              android: 'chevron_right',
+              web: 'chevron_right',
+            }}
+            size={15}
+            tintColor={colors.primary}
+          />
+        </Pressable>
+      ) : documents.length > 0 ? (
+        <View style={styles.countChip}>
+          <Text style={styles.countChipText}>{documents.length}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  const documentsList = (
+    <>
+      {documents.length === 0 ? (
+        <View style={[styles.emptyState, styles.emptyStateTablet]}>
+          <EmptyDocumentsArt
+            styles={styles}
+            locale={locale}
+            showcaseLabel={t('home.emptyShowcase')}
+          />
+          <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
+        </View>
+      ) : (
+        <View style={styles.tabletDocsList}>
+          {recentDocuments.map((doc) => {
+            const template = resolveTemplateForDocument(doc, templatesMap);
+
+            return (
+              <DocumentCard
+                key={doc.id}
+                document={doc}
+                template={template}
+                compact
+                onPress={() => router.push(`/document/${doc.id}`)}
+                onLongPress={() => setSelectedDocument(doc)}
+              />
+            );
+          })}
+        </View>
+      )}
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      {layout.isTablet ? (
+        <View style={[styles.container, styles.containerTablet, styles.tabletScreen]}>
+          {brandBar}
+
+          <View style={styles.tabletBody}>
+            <View style={styles.tabletSidebar}>
+              <Animated.View
+                entering={FadeInDown.delay(110).duration(480).springify()}
+                style={styles.tabletPanel}
+              >
+                <ScalePressable
+                  onPress={() => router.push('/create' as Href)}
+                  style={styles.createShell}
+                >
+                  <LinearGradient
+                    colors={['#6366f1', '#4f46e5', '#4338ca']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.createGradientTablet}
+                  >
+                    <View style={styles.createTabletTop}>
+                      <View style={styles.createIcon}>
+                        <SymbolView
+                          name={{ ios: 'plus', android: 'add', web: 'add' }}
+                          size={26}
+                          tintColor="#fff"
+                          weight="bold"
+                        />
+                      </View>
+                      <SymbolView
+                        name={{
+                          ios: 'chevron.right',
+                          android: 'arrow_forward',
+                          web: 'arrow_forward',
+                        }}
+                        size={20}
+                        tintColor="rgba(255,255,255,0.9)"
+                      />
+                    </View>
+                    <Text style={styles.createTitle}>{t('home.createDocument')}</Text>
+                    <Text style={styles.createSubtitle}>{t('home.createSubtitle')}</Text>
+                  </LinearGradient>
+                </ScalePressable>
+
+                <View style={styles.tabletTools}>
+                  <QuickAction
+                    title={t('home.importPdf')}
+                    subtitle={t('home.importPdfSubtitle')}
+                    icon={{
+                      ios: 'square.and.arrow.down.fill',
+                      android: 'download',
+                      web: 'download',
+                    }}
+                    accent={colors.importTitle}
+                    soft="#ccfbf1"
+                    softDark="#134e4a"
+                    loading={importing}
+                    onPress={handleImportPdf}
+                    styles={styles}
+                    colors={colors}
+                  />
+                  <View style={styles.tabletToolsDivider} />
+                  <QuickAction
+                    title={t('home.templatesTitle')}
+                    subtitle={t('home.templatesSubtitle')}
+                    icon={{
+                      ios: 'square.grid.2x2.fill',
+                      android: 'dashboard_customize',
+                      web: 'dashboard_customize',
+                    }}
+                    accent={colors.primary}
+                    soft={colors.primarySoft}
+                    onPress={() => router.push('/templates' as Href)}
+                    styles={styles}
+                    colors={colors}
+                  />
+                </View>
+              </Animated.View>
+            </View>
+
+            <Animated.View
+              entering={FadeInDown.delay(160).duration(450).springify()}
+              style={styles.tabletMain}
+              onLayout={(event) => {
+                setTabletMainHeight(event.nativeEvent.layout.height);
+              }}
+            >
+              <View
+                style={[
+                  styles.tabletPanel,
+                  styles.tabletDocsPanel,
+                  tabletMainHeight > 0 ? { maxHeight: tabletMainHeight } : null,
+                ]}
+              >
+                {documentsHeader}
+                <ScrollView
+                  style={
+                    tabletMainHeight > 0
+                      ? {
+                          maxHeight: tabletDocsViewportHeight,
+                        }
+                      : undefined
+                  }
+                  contentContainerStyle={styles.tabletDocsScrollContent}
+                  onContentSizeChange={(_width, height) => {
+                    setDocsContentHeight(height);
+                  }}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  {documentsList}
+                </ScrollView>
+              </View>
+            </Animated.View>
+          </View>
+        </View>
+      ) : (
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, layout.listContentStyle]}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInDown.duration(420).springify()} style={styles.topBar}>
-          <View style={styles.brandBlock}>
-            <LinearGradient
-              colors={['#6366f1', '#4f46e5']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.brandMark}
-            >
-              <SymbolView
-                name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }}
-                size={18}
-                tintColor="#fff"
-              />
-            </LinearGradient>
-            <View style={styles.brandText}>
-              <Text style={styles.brandName}>Mobile Docs</Text>
-              <Text style={styles.brandMeta}>
-                {documents.length} {pluralDocuments(documents.length)}
-              </Text>
-            </View>
-          </View>
+        {brandBar}
 
-          <ScalePressable
-            onPress={() => router.push('/settings' as Href)}
-            style={styles.iconButton}
-          >
-            <SymbolView
-              name={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' }}
-              size={22}
-              tintColor={colors.primary}
-              weight="semibold"
-            />
-          </ScalePressable>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(110).duration(480).springify()}>
-          <ScalePressable
-            onPress={() => router.push('/create' as Href)}
-            style={styles.createShell}
-          >
-            <LinearGradient
-              colors={['#6366f1', '#4f46e5', '#4338ca']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.createGradient}
-            >
-              <View style={styles.createIcon}>
-                <SymbolView
-                  name={{ ios: 'plus', android: 'add', web: 'add' }}
-                  size={26}
-                  tintColor="#fff"
-                  weight="bold"
-                />
-              </View>
-              <View style={styles.createTextWrap}>
-                <Text style={styles.createTitle}>{t('home.createDocument')}</Text>
-                <Text style={styles.createSubtitle}>{t('home.createSubtitle')}</Text>
-              </View>
-              <SymbolView
-                name={{ ios: 'chevron.right', android: 'arrow_forward', web: 'arrow_forward' }}
-                size={22}
-                tintColor="rgba(255,255,255,0.9)"
-              />
-            </LinearGradient>
-          </ScalePressable>
-        </Animated.View>
-
-        <Animated.View
-          entering={FadeInDown.delay(160).duration(480).springify()}
-          style={styles.toolsCard}
-        >
-          <QuickAction
-            title={t('home.importPdf')}
-            subtitle={t('home.importPdfSubtitle')}
-            icon={{ ios: 'square.and.arrow.down.fill', android: 'download', web: 'download' }}
-            accent={colors.importTitle}
-            soft="#ccfbf1"
-            softDark="#134e4a"
-            loading={importing}
-            onPress={handleImportPdf}
-            styles={styles}
-            colors={colors}
-          />
-          <View style={styles.toolsDivider} />
-          <QuickAction
-            title={t('home.templatesTitle')}
-            subtitle={t('home.templatesSubtitle')}
-            icon={{ ios: 'square.grid.2x2.fill', android: 'dashboard_customize', web: 'dashboard_customize' }}
-            accent={colors.primary}
-            soft={colors.primarySoft}
-            onPress={() => router.push('/templates' as Href)}
-            styles={styles}
-            colors={colors}
-          />
-        </Animated.View>
-
-        <Animated.View
-          entering={FadeInDown.delay(210).duration(450).springify()}
-          style={styles.listHeader}
-        >
-          <Text style={styles.listTitle}>{t('home.listTitle')}</Text>
-          {hasMoreDocuments ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('home.viewAll')}
-              onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/documents' as Href);
-              }}
-              style={({ pressed }) => [styles.viewAllButton, pressed && styles.viewAllPressed]}
-            >
-              <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
-              <View style={styles.viewAllCount}>
-                <Text style={styles.viewAllCountText}>{documents.length}</Text>
-              </View>
-              <SymbolView
-                name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
-                size={15}
-                tintColor={colors.primary}
-              />
-            </Pressable>
-          ) : documents.length > 0 ? (
-            <View style={styles.countChip}>
-              <Text style={styles.countChipText}>{documents.length}</Text>
-            </View>
-          ) : null}
-        </Animated.View>
-
-        {documents.length === 0 ? (
-          <Animated.View
-            entering={FadeInDown.delay(250).duration(500).springify()}
-            style={styles.emptyState}
-          >
-            <EmptyDocumentsArt
-              styles={styles}
-              locale={locale}
-              showcaseLabel={t('home.emptyShowcase')}
-            />
-            <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
-            <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
-          </Animated.View>
-        ) : (
-          <View style={styles.list}>
-            {recentDocuments.map((doc, index) => {
-              const template = resolveTemplateForDocument(doc, templatesMap);
-
-              return (
-                <Animated.View
-                  key={doc.id}
-                  entering={FadeInDown.delay(80 + index * 45).duration(420).springify()}
+          <>
+            <Animated.View entering={FadeInDown.delay(110).duration(480).springify()}>
+              <ScalePressable
+                onPress={() => router.push('/create' as Href)}
+                style={styles.createShell}
+              >
+                <LinearGradient
+                  colors={['#6366f1', '#4f46e5', '#4338ca']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.createGradient}
                 >
-                  <DocumentCard
-                    document={doc}
-                    template={template}
-                    compact
-                    onPress={() => router.push(`/document/${doc.id}`)}
-                    onLongPress={() => setSelectedDocument(doc)}
+                  <View style={styles.createIcon}>
+                    <SymbolView
+                      name={{ ios: 'plus', android: 'add', web: 'add' }}
+                      size={26}
+                      tintColor="#fff"
+                      weight="bold"
+                    />
+                  </View>
+                  <View style={styles.createTextWrap}>
+                    <Text style={styles.createTitle}>{t('home.createDocument')}</Text>
+                    <Text style={styles.createSubtitle}>{t('home.createSubtitle')}</Text>
+                  </View>
+                  <SymbolView
+                    name={{
+                      ios: 'chevron.right',
+                      android: 'arrow_forward',
+                      web: 'arrow_forward',
+                    }}
+                    size={22}
+                    tintColor="rgba(255,255,255,0.9)"
                   />
-                </Animated.View>
-              );
-            })}
-          </View>
-        )}
+                </LinearGradient>
+              </ScalePressable>
+            </Animated.View>
+
+            <Animated.View
+              entering={FadeInDown.delay(160).duration(480).springify()}
+              style={styles.toolsCard}
+            >
+              <QuickAction
+                title={t('home.importPdf')}
+                subtitle={t('home.importPdfSubtitle')}
+                icon={{
+                  ios: 'square.and.arrow.down.fill',
+                  android: 'download',
+                  web: 'download',
+                }}
+                accent={colors.importTitle}
+                soft="#ccfbf1"
+                softDark="#134e4a"
+                loading={importing}
+                onPress={handleImportPdf}
+                styles={styles}
+                colors={colors}
+              />
+              <View style={styles.toolsDivider} />
+              <QuickAction
+                title={t('home.templatesTitle')}
+                subtitle={t('home.templatesSubtitle')}
+                icon={{
+                  ios: 'square.grid.2x2.fill',
+                  android: 'dashboard_customize',
+                  web: 'dashboard_customize',
+                }}
+                accent={colors.primary}
+                soft={colors.primarySoft}
+                onPress={() => router.push('/templates' as Href)}
+                styles={styles}
+                colors={colors}
+              />
+            </Animated.View>
+
+            <Animated.View
+              entering={FadeInDown.delay(210).duration(450).springify()}
+              style={styles.listHeader}
+            >
+              <Text style={styles.listTitle}>{t('home.listTitle')}</Text>
+              {hasMoreDocuments ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('home.viewAll')}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push('/documents' as Href);
+                  }}
+                  style={({ pressed }) => [styles.viewAllButton, pressed && styles.viewAllPressed]}
+                >
+                  <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
+                  <View style={styles.viewAllCount}>
+                    <Text style={styles.viewAllCountText}>{documents.length}</Text>
+                  </View>
+                  <SymbolView
+                    name={{
+                      ios: 'chevron.right',
+                      android: 'chevron_right',
+                      web: 'chevron_right',
+                    }}
+                    size={15}
+                    tintColor={colors.primary}
+                  />
+                </Pressable>
+              ) : documents.length > 0 ? (
+                <View style={styles.countChip}>
+                  <Text style={styles.countChipText}>{documents.length}</Text>
+                </View>
+              ) : null}
+            </Animated.View>
+
+            {documents.length === 0 ? (
+              <Animated.View
+                entering={FadeInDown.delay(250).duration(500).springify()}
+                style={styles.emptyState}
+              >
+                <EmptyDocumentsArt
+                  styles={styles}
+                  locale={locale}
+                  showcaseLabel={t('home.emptyShowcase')}
+                />
+                <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+                <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
+              </Animated.View>
+            ) : (
+              <View style={styles.list}>
+                {recentDocuments.map((doc, index) => {
+                  const template = resolveTemplateForDocument(doc, templatesMap);
+
+                  return (
+                    <Animated.View
+                      key={doc.id}
+                      entering={FadeInDown.delay(80 + index * 45).duration(420).springify()}
+                    >
+                      <DocumentCard
+                        document={doc}
+                        template={template}
+                        compact
+                        onPress={() => router.push(`/document/${doc.id}`)}
+                        onLongPress={() => setSelectedDocument(doc)}
+                      />
+                    </Animated.View>
+                  );
+                })}
+              </View>
+            )}
+          </>
       </ScrollView>
+      )}
 
       <ActionSheet
         visible={!!selectedDocument}
@@ -581,11 +806,75 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: 20,
       gap: 8,
     },
+    containerTablet: {
+      width: '100%',
+      maxWidth: 1040,
+      alignSelf: 'center',
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: 24,
+      gap: 18,
+    },
+    tabletScreen: {
+      flex: 1,
+    },
+    tabletBody: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 16,
+      minHeight: 0,
+    },
+    tabletSidebar: {
+      width: 320,
+      flexShrink: 0,
+    },
+    tabletMain: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 0,
+      alignSelf: 'stretch',
+    },
+    tabletPanel: {
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.xl,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+      gap: 12,
+      ...AppDesign.cardShadow,
+    },
+    tabletDocsPanel: {
+      width: '100%',
+      alignSelf: 'flex-start',
+    },
+    tabletDocsScrollContent: {
+      paddingBottom: 4,
+    },
+    tabletTools: {
+      borderRadius: AppDesign.radius.lg,
+      backgroundColor: colors.backgroundSoft,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    tabletDocsList: {
+      gap: 8,
+    },
+    listHeaderTablet: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 2,
+      paddingBottom: 2,
+      flexShrink: 0,
+    },
     topBar: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
+      flexShrink: 0,
     },
     brandBlock: {
       flex: 1,
@@ -640,6 +929,18 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 16,
       minHeight: 80,
     },
+    createGradientTablet: {
+      gap: 10,
+      paddingVertical: 18,
+      paddingHorizontal: 16,
+      minHeight: 132,
+    },
+    createTabletTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 2,
+    },
     createIcon: {
       width: 44,
       height: 44,
@@ -668,11 +969,17 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
+      ...AppDesign.cardShadow,
     },
     toolsDivider: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: colors.border,
       marginLeft: 68,
+    },
+    tabletToolsDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.border,
+      marginHorizontal: 14,
     },
     quickAction: {
       flexDirection: 'row',
@@ -783,6 +1090,16 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       gap: 10,
       ...AppDesign.cardShadow,
+    },
+    emptyStateTablet: {
+      minHeight: 220,
+      justifyContent: 'center',
+      marginVertical: 0,
+      paddingVertical: 28,
+      borderWidth: 0,
+      backgroundColor: colors.backgroundSoft,
+      shadowOpacity: 0,
+      elevation: 0,
     },
     emptyShowcase: {
       alignItems: 'center',

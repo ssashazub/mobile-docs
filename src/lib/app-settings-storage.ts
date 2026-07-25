@@ -29,6 +29,10 @@ function normalizeSettings(raw: Partial<AppSettings> | null | undefined): AppSet
     fileNameFormat: isFileNameFormat(raw?.fileNameFormat)
       ? raw.fileNameFormat
       : DEFAULT_APP_SETTINGS.fileNameFormat,
+    hapticsEnabled:
+      typeof raw?.hapticsEnabled === 'boolean'
+        ? raw.hapticsEnabled
+        : DEFAULT_APP_SETTINGS.hapticsEnabled,
   };
 }
 

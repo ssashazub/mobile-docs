@@ -10,8 +10,10 @@ import { showAppAlert } from '@/components/ui/app-alert';
 import { LoadingState } from '@/components/ui/loading-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { AppDesign } from '@/constants/app-design';
+import { Layout } from '@/constants/layout';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { getDocuments, updateDocument } from '@/lib/document-storage';
 import {
@@ -33,9 +35,25 @@ function parseDocumentId(id: string | string[] | undefined): number | null {
   return parsedId;
 }
 
-function withPreviewChrome(html: string): string {
+function withPreviewChrome(html: string, isTablet: boolean): string {
   // Keep preview as print paper: WebView may auto-darken pages in app dark mode.
-  // Fill the available preview width while keeping A4 portrait proportions.
+  // On phones fill width; on tablets keep a centered paper-sized page.
+  const pageWidthRule = isTablet
+    ? `
+        width: min(100%, ${Layout.previewPageMaxWidth}px) !important;
+        max-width: ${Layout.previewPageMaxWidth}px !important;
+        margin: 20px auto !important;
+        border-radius: 10px !important;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
+      `
+    : `
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      `;
+
   const chrome = `
     <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=3" />
@@ -55,22 +73,18 @@ function withPreviewChrome(html: string): string {
       }
       body {
         color: #0f172a !important;
-        padding: 0 !important;
+        padding: ${isTablet ? '12px 16px 28px' : '0'} !important;
       }
       .page-shell {
         width: 100% !important;
       }
       .page {
-        width: 100% !important;
-        max-width: none !important;
+        ${pageWidthRule}
         min-height: 0 !important;
         height: auto !important;
-        margin: 0 !important;
         padding: 20px 18px 24px !important;
         background: #ffffff !important;
         color: #0f172a !important;
-        border-radius: 0;
-        box-shadow: none;
         overflow: visible;
         box-sizing: border-box !important;
         display: block !important;
@@ -122,6 +136,7 @@ function withPreviewChrome(html: string): string {
 export default function DocumentPdfPreviewScreen() {
   const { t } = useI18n();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -269,11 +284,11 @@ export default function DocumentPdfPreviewScreen() {
     }
 
     if (prepared.previewHtml) {
-      return { html: withPreviewChrome(prepared.previewHtml) };
+      return { html: withPreviewChrome(prepared.previewHtml, layout.isTablet) };
     }
 
     return { uri: prepared.uri };
-  }, [prepared]);
+  }, [layout.isTablet, prepared]);
 
   return (
     <>
@@ -333,7 +348,7 @@ export default function DocumentPdfPreviewScreen() {
               </View>
             </View>
 
-            <View style={styles.actions}>
+            <View style={[styles.actions, layout.isTablet && styles.actionsTablet]}>
               <Pressable
                 onPress={handleShare}
                 disabled={busy !== null}
@@ -510,6 +525,12 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       gap: 10,
       paddingHorizontal: 16,
+    },
+    actionsTablet: {
+      maxWidth: Layout.contentMaxWidth,
+      alignSelf: 'center',
+      width: '100%',
+      paddingHorizontal: 24,
     },
     primaryAction: {
       flex: 1.35,

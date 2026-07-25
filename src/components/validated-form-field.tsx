@@ -13,6 +13,9 @@ type ValidatedFormFieldProps = Omit<TextInputProps, 'onChangeText'> & {
   onChangeText: (value: string) => void;
   fieldKey: string;
   kind?: FieldInputKind;
+  required?: boolean;
+  error?: boolean;
+  shakeToken?: number;
 };
 
 export function ValidatedFormField({
@@ -21,6 +24,9 @@ export function ValidatedFormField({
   onChangeText,
   fieldKey,
   kind,
+  required,
+  error,
+  shakeToken,
   multiline,
   placeholder,
   style,
@@ -38,6 +44,9 @@ export function ValidatedFormField({
     <FormField
       label={label}
       value={value}
+      required={required}
+      error={error}
+      shakeToken={shakeToken}
       onChangeText={(text) => onChangeText(sanitizeFieldInput(resolvedKind, text))}
       placeholder={placeholder ?? kindProps.placeholder}
       multiline={multiline}

@@ -18,6 +18,7 @@ import { getTemplateById } from '@/lib/template-storage';
 import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { useLayout } from '@/hooks/use-layout';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate } from '@/types/template';
 
@@ -72,6 +73,7 @@ export default function DocumentDetailsScreen() {
   const documentId = parseDocumentId(id);
   const insets = useSafeAreaInsets();
   const colors = useTheme();
+  const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [document, setDocument] = useState<Document | null>(null);
@@ -189,6 +191,7 @@ export default function DocumentDetailsScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.content,
+            layout.contentStyle,
             { paddingBottom: insets.bottom + Spacing.four },
           ]}
           showsVerticalScrollIndicator={false}
