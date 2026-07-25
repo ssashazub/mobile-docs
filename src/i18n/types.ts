@@ -194,6 +194,7 @@ export type TranslationSchema = {
     exportDialog: string;
     templateNotFound: string;
     generateFailed: string;
+    generateTimeout: string;
     sharingUnavailable: string;
     printFailed: string;
   };

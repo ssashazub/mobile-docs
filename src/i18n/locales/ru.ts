@@ -195,6 +195,7 @@ export const ru: TranslationSchema = {
     exportDialog: 'Экспорт PDF',
     templateNotFound: 'Шаблон документа не найден.',
     generateFailed: 'Не удалось сформировать PDF.',
+    generateTimeout: 'Формирование PDF заняло слишком много времени. Попробуйте ещё раз.',
     sharingUnavailable: 'Sharing недоступен на этом устройстве.',
     printFailed: 'Не удалось открыть окно печати.',
   },

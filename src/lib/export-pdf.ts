@@ -23,6 +23,59 @@ export type PreparedPdfExport = {
   previewHtml?: string;
 };
 
+/**
+ * Rendering HTML to PDF happens in an offscreen native WebView that can silently
+ * stall (most often when the window is resized mid-render on tablets), leaving the
+ * promise unsettled forever. Time it out and retry with a fresh renderer instead.
+ */
+const RENDER_TIMEOUT_MS = 15000;
+const RENDER_TIMEOUT_MARKER = Symbol('pdf-render-timeout');
+
+function raceWithTimeout<T>(task: Promise<T>): Promise<T | typeof RENDER_TIMEOUT_MARKER> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve(RENDER_TIMEOUT_MARKER), RENDER_TIMEOUT_MS);
+
+    task.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (taskError) => {
+        clearTimeout(timer);
+        reject(taskError);
+      }
+    );
+  });
+}
+
+async function renderHtmlToPdfBase64(html: string): Promise<string> {
+  const render = () =>
+    Print.printToFileAsync({
+      html,
+      base64: true,
+      width: PDF_A4.widthPx,
+      height: PDF_A4.heightPx,
+      // Keep Android text metrics stable; layout width is fixed via CSS zoom.
+      textZoom: 100,
+    });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await raceWithTimeout(render());
+
+    if (result === RENDER_TIMEOUT_MARKER) {
+      continue;
+    }
+
+    if (!result.base64) {
+      throw new Error(t('pdf.generateFailed'));
+    }
+
+    return result.base64;
+  }
+
+  throw new Error(t('pdf.generateTimeout'));
+}
+
 async function sharePdfFile(
   fileUri: string,
   dialogTitle: string,
@@ -71,18 +124,7 @@ async function buildTemplatePdf(document: Document): Promise<{
   }
 
   const previewHtml = renderDocumentPdfHtml(document, template);
-  const { base64 } = await Print.printToFileAsync({
-    html: previewHtml,
-    base64: true,
-    width: PDF_A4.widthPx,
-    height: PDF_A4.heightPx,
-    // Keep Android text metrics stable; layout width is fixed via CSS zoom.
-    textZoom: 100,
-  });
-
-  if (!base64) {
-    throw new Error(t('pdf.generateFailed'));
-  }
+  const base64 = await renderHtmlToPdfBase64(previewHtml);
 
   let pdfBytes = base64ToUint8Array(base64);
   pdfBytes = await embedMetadataInPdfBytes(

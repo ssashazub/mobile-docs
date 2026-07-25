@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { type Href, Stack, useLocalSearchParams, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -23,6 +23,24 @@ import {
   type PreparedPdfExport,
 } from '@/lib/export-pdf';
 import type { Document } from '@/types/document';
+
+/**
+ * Give the navigation transition a beat to finish before starting native PDF render.
+ * InteractionManager is deprecated; requestIdleCallback (with timeout) is the RN replacement.
+ */
+function waitForIdleUi(): Promise<void> {
+  return new Promise((resolve) => {
+    const idle = globalThis.requestIdleCallback;
+    if (typeof idle === 'function') {
+      idle(() => resolve(), { timeout: 400 });
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      setTimeout(resolve, 300);
+    });
+  });
+}
 
 function parseDocumentId(id: string | string[] | undefined): number | null {
   const rawId = Array.isArray(id) ? id[0] : id;
@@ -151,6 +169,7 @@ export default function DocumentPdfPreviewScreen() {
   const [nameDialog, setNameDialog] = useState<'rename' | null>(null);
   const [nameValue, setNameValue] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const runIdRef = useRef(0);
 
   const loadPreview = useCallback(async () => {
     if (documentId === null) {
@@ -159,12 +178,21 @@ export default function DocumentPdfPreviewScreen() {
       return;
     }
 
+    const runId = runIdRef.current + 1;
+    runIdRef.current = runId;
+    const isStale = () => runIdRef.current !== runId;
+
     setLoading(true);
     setError(null);
     setPrepared(null);
 
     try {
       const documents = await getDocuments();
+
+      if (isStale()) {
+        return;
+      }
+
       const found = documents.find((item) => item.id === documentId);
 
       if (!found) {
@@ -173,12 +201,29 @@ export default function DocumentPdfPreviewScreen() {
       }
 
       setDocument(found);
+      await waitForIdleUi();
+
+      if (isStale()) {
+        return;
+      }
+
       const next = await prepareDocumentPdf(found);
+
+      if (isStale()) {
+        return;
+      }
+
       setPrepared(next);
     } catch (loadError) {
+      if (isStale()) {
+        return;
+      }
+
       setError(loadError instanceof Error ? loadError.message : t('pdf.generateFailed'));
     } finally {
-      setLoading(false);
+      if (!isStale()) {
+        setLoading(false);
+      }
     }
   }, [documentId, t]);
 

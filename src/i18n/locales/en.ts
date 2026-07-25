@@ -203,6 +203,7 @@ export const en: TranslationSchema = {
         exportDialog: 'Export PDF',
         templateNotFound: 'Document template not found.',
         generateFailed: 'Failed to generate PDF.',
+        generateTimeout: 'PDF generation took too long. Please try again.',
         sharingUnavailable: 'Sharing is not available on this device.',
         printFailed: 'Failed to open the print dialog.',
     },

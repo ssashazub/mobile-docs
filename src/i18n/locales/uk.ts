@@ -195,6 +195,7 @@ export const uk: TranslationSchema = {
     exportDialog: 'Експорт PDF',
     templateNotFound: 'Шаблон документа не знайдено.',
     generateFailed: 'Не вдалося сформувати PDF.',
+    generateTimeout: 'Формування PDF тривало задовго. Спробуйте ще раз.',
     sharingUnavailable: 'Sharing недоступний на цьому пристрої.',
     printFailed: 'Не вдалося відкрити вікно друку.',
   },
