@@ -28,8 +28,8 @@ export function useLayout(): AppLayout {
 
   return useMemo(() => {
     const shortest = Math.min(width, height);
-    const isTablet = shortest >= Layout.tabletMinWidth || width >= Layout.tabletMinWidth;
-    const isLargeTablet = width >= Layout.largeTabletMinWidth;
+    const isTablet = shortest >= Layout.tabletMinWidth;
+    const isLargeTablet = isTablet && width >= Layout.largeTabletMinWidth;
     const columns: 1 | 2 | 3 = !isTablet ? 1 : isLargeTablet ? 3 : 2;
 
     const contentMaxWidth = Math.min(Layout.contentMaxWidth, MaxContentWidth);

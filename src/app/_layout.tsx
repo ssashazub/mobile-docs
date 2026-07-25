@@ -1,24 +1,58 @@
 import { useEffect, type ReactNode } from 'react';
+import { Dimensions, Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { AppAlertProvider } from '@/components/ui/app-alert';
 import { AppSettingsProvider, useAppSettings } from '@/contexts/app-settings-context';
 import { LocalePreferenceProvider, useLocalePreference } from '@/contexts/locale-preference-context';
 import { ThemePreferenceProvider, useThemePreference } from '@/contexts/theme-preference-context';
+import { Layout } from '@/constants/layout';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useLayout } from '@/hooks/use-layout';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Splash may already be hidden in some environments (web / fast refresh).
 });
 
+function isTabletWindow(width: number, height: number): boolean {
+  const shortest = Math.min(width, height);
+  return shortest >= Layout.tabletMinWidth;
+}
+
+async function applyDeviceOrientationLock(isTablet: boolean): Promise<void> {
+  if (Platform.OS === 'web') {
+    return;
+  }
+
+  try {
+    if (isTablet) {
+      await ScreenOrientation.unlockAsync();
+      return;
+    }
+
+    await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  } catch {
+    // Orientation lock can fail on unsupported embeds; ignore.
+  }
+}
+
+const initialWindow = Dimensions.get('window');
+void applyDeviceOrientationLock(isTabletWindow(initialWindow.width, initialWindow.height));
+
 function RootNavigator() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { t } = useI18n();
+  const layout = useLayout();
+
+  useEffect(() => {
+    void applyDeviceOrientationLock(layout.isTablet);
+  }, [layout.isTablet]);
 
   return (
     <>
@@ -30,6 +64,7 @@ function RootNavigator() {
           headerTitleStyle: { fontWeight: '600' },
           headerShadowVisible: false,
           contentStyle: { backgroundColor: colors.background },
+          orientation: layout.isTablet ? 'default' : 'portrait',
         }}
       >
         <Stack.Screen name="index" options={{ title: t('home.title') }} />
