@@ -242,7 +242,10 @@ export default function HomeScreen() {
   const documentsList = (
     <>
       {documents.length === 0 ? (
-        <View style={[styles.emptyState, styles.emptyStateTablet]}>
+        <ScalePressable
+          onPress={() => router.push('/create' as Href)}
+          style={[styles.emptyState, styles.emptyStateTablet]}
+        >
           <EmptyDocumentsArt
             styles={styles}
             locale={locale}
@@ -250,7 +253,7 @@ export default function HomeScreen() {
           />
           <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
           <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
-        </View>
+        </ScalePressable>
       ) : (
         <View style={styles.tabletDocsList}>
           {recentDocuments.map((doc) => {
@@ -508,17 +511,19 @@ export default function HomeScreen() {
             </Animated.View>
 
             {documents.length === 0 ? (
-              <Animated.View
-                entering={FadeInDown.delay(250).duration(500).springify()}
-                style={styles.emptyState}
-              >
-                <EmptyDocumentsArt
-                  styles={styles}
-                  locale={locale}
-                  showcaseLabel={t('home.emptyShowcase')}
-                />
-                <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
-                <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
+              <Animated.View entering={FadeInDown.delay(250).duration(500).springify()}>
+                <ScalePressable
+                  onPress={() => router.push('/create' as Href)}
+                  style={styles.emptyState}
+                >
+                  <EmptyDocumentsArt
+                    styles={styles}
+                    locale={locale}
+                    showcaseLabel={t('home.emptyShowcase')}
+                  />
+                  <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+                  <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
+                </ScalePressable>
               </Animated.View>
             ) : (
               <View style={styles.list}>
