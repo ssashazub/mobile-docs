@@ -14,11 +14,13 @@ import { getDocuments } from '@/lib/document-storage';
 type EditorOverflowMenuProps = {
   onGoHome: () => void;
   onOpenLibrary?: () => void;
+  onEditTemplate?: () => void;
 };
 
 export function EditorOverflowMenu({
   onGoHome,
   onOpenLibrary,
+  onEditTemplate,
 }: EditorOverflowMenuProps) {
   const { t } = useI18n();
   const colors = useTheme();
@@ -51,6 +53,20 @@ export function EditorOverflowMenu({
       symbol: { ios: 'house.fill', android: 'home', web: 'home' },
       onPress: onGoHome,
     },
+    ...(onEditTemplate
+      ? [
+          {
+            key: 'editTemplate',
+            label: t('common.editTemplate'),
+            symbol: {
+              ios: 'square.and.pencil' as const,
+              android: 'edit_note' as const,
+              web: 'edit_note' as const,
+            },
+            onPress: onEditTemplate,
+          },
+        ]
+      : []),
     ...(showLibrary
       ? [
           {
@@ -92,7 +108,11 @@ export function EditorOverflowMenu({
       useNativeDriver: true,
     }).start(() => {
       setVisible(false);
-      afterClose?.();
+      if (afterClose) {
+        // Defer navigation until the modal overlay is fully unmounted,
+        // otherwise the closing overlay stays on top and blocks the next screen.
+        setTimeout(afterClose, 0);
+      }
     });
   };
 

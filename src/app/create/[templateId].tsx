@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -27,6 +27,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import * as Haptics from '@/lib/haptics';
+import {
+  consumePendingCreateTemplateSwitch,
+  saveCreateDocumentDraft,
+  takeCreateDocumentDraft,
+} from '@/lib/create-document-draft';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
@@ -43,6 +48,10 @@ export default function CreateDocumentFormScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { templateId } = useLocalSearchParams<{ templateId: string }>();
   const insets = useSafeAreaInsets();
+  const initializedRef = useRef(false);
+  const fieldsRef = useRef<Record<string, string>>({});
+  const pdfStyleRef = useRef<PdfStyle>(normalizePdfStyle(undefined));
+  const allowNavigationRef = useRef<() => void>(() => undefined);
 
   const [template, setTemplate] = useState<DocumentTemplate | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -59,13 +68,28 @@ export default function CreateDocumentFormScreen() {
     focusInvalidField,
   } = useFieldFocusOnError();
 
+  fieldsRef.current = fields;
+  pdfStyleRef.current = pdfStyle;
+
+  useEffect(() => {
+    initializedRef.current = false;
+    setTemplate(null);
+    setFields({});
+    setPdfStyle(normalizePdfStyle(undefined));
+    setLoading(true);
+  }, [templateId]);
+
   const loadTemplate = useCallback(async () => {
     if (!templateId) {
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const isFirstLoad = !initializedRef.current;
+    if (isFirstLoad) {
+      setLoading(true);
+    }
+
     const loaded = await getTemplateById(templateId);
 
     if (!loaded) {
@@ -74,22 +98,37 @@ export default function CreateDocumentFormScreen() {
       return;
     }
 
+    const savedDraft = isFirstLoad ? takeCreateDocumentDraft(templateId) : null;
+
     setTemplate(loaded);
-    setFields(Object.fromEntries(loaded.fields.map((field) => [field.key, ''])));
-    setPdfStyle(normalizePdfStyle(loaded.pdfStyle, loaded.id));
+    setFields((current) =>
+      Object.fromEntries(
+        loaded.fields.map((field) => [
+          field.key,
+          savedDraft?.fields[field.key] ?? (isFirstLoad ? '' : (current[field.key] ?? '')),
+        ])
+      )
+    );
+
+    if (isFirstLoad) {
+      setPdfStyle(savedDraft?.pdfStyle ?? normalizePdfStyle(loaded.pdfStyle, loaded.id));
+      initializedRef.current = true;
+    }
+
     setLoading(false);
   }, [templateId]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadTemplate();
-    }, [loadTemplate])
-  );
+  const hasChanges = useMemo(() => {
+    if (!template) {
+      return false;
+    }
 
-  const updateField = (key: string, value: string) => {
-    clearFieldError(key);
-    setFields((current) => ({ ...current, [key]: value }));
-  };
+    const initialStyle = normalizePdfStyle(template.pdfStyle, template.id);
+    return (
+      Object.values(fields).some((value) => value.length > 0) ||
+      JSON.stringify(pdfStyle) !== JSON.stringify(initialStyle)
+    );
+  }, [fields, pdfStyle, template]);
 
   const navigateAfterExit = (destination: 'home' | 'library') => {
     if (destination === 'home') {
@@ -136,7 +175,7 @@ export default function CreateDocumentFormScreen() {
 
       await addDocument(newDocument);
       if (destination === 'detail') {
-        allowNavigation();
+        allowNavigationRef.current();
         router.replace(`/document/${newDocument.id}`);
       } else if (destination !== 'none') {
         navigateAfterExit(destination);
@@ -147,22 +186,43 @@ export default function CreateDocumentFormScreen() {
     }
   };
 
-  const hasChanges = useMemo(() => {
-    if (!template) {
-      return false;
-    }
-
-    const initialStyle = normalizePdfStyle(template.pdfStyle, template.id);
-    return (
-      Object.values(fields).some((value) => value.length > 0) ||
-      JSON.stringify(pdfStyle) !== JSON.stringify(initialStyle)
-    );
-  }, [fields, pdfStyle, template]);
-
   const allowNavigation = useUnsavedChangesGuard({
     hasChanges,
     onSave: () => handleCreate('none'),
   });
+  allowNavigationRef.current = allowNavigation;
+
+  useFocusEffect(
+    useCallback(() => {
+      const nextTemplateId = consumePendingCreateTemplateSwitch();
+      if (nextTemplateId && templateId && nextTemplateId !== templateId) {
+        saveCreateDocumentDraft({
+          templateId: nextTemplateId,
+          fields: fieldsRef.current,
+          pdfStyle: pdfStyleRef.current,
+        });
+        allowNavigationRef.current();
+        router.replace(`/create/${nextTemplateId}` as Href);
+        return;
+      }
+
+      void loadTemplate();
+    }, [loadTemplate, templateId])
+  );
+
+  const updateField = (key: string, value: string) => {
+    clearFieldError(key);
+    setFields((current) => ({ ...current, [key]: value }));
+  };
+
+  const openTemplateEditor = () => {
+    if (!templateId) {
+      return;
+    }
+
+    allowNavigation();
+    router.push(`/templates/edit/${templateId}?fromCreate=1` as Href);
+  };
 
   const fieldList = useMemo(() => template?.fields ?? [], [template]);
 
@@ -192,6 +252,7 @@ export default function CreateDocumentFormScreen() {
             <EditorOverflowMenu
               onGoHome={() => navigateAfterExit('home')}
               onOpenLibrary={() => navigateAfterExit('library')}
+              onEditTemplate={openTemplateEditor}
             />
           ),
         }}

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -27,15 +28,22 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import { setPendingCreateTemplateSwitch } from '@/lib/create-document-draft';
 import { createEmptyField, normalizePdfStyle, normalizeTemplate } from '@/lib/template-helpers';
 import { normalizeTemplateIcon } from '@/lib/template-icon';
 import type { TemplateIcon } from '@/constants/template-icons';
-import { getTemplateById, resetTemplateToDefault, saveTemplate } from '@/lib/template-storage';
+import {
+  getNextCustomTemplateId,
+  getTemplateById,
+  resetTemplateToDefault,
+  saveTemplate,
+} from '@/lib/template-storage';
 import type { DocumentTemplate, PdfStyle, TemplateField } from '@/types/template';
 
 export default function EditTemplateScreen() {
   const { t } = useI18n();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, fromCreate } = useLocalSearchParams<{ id: string; fromCreate?: string }>();
+  const openedFromCreate = fromCreate === '1' || fromCreate === 'true';
   const insets = useSafeAreaInsets();
   const colors = useTheme();
   const layout = useLayout();
@@ -49,6 +57,8 @@ export default function EditTemplateScreen() {
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>(normalizePdfStyle(undefined));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [nameDialogVisible, setNameDialogVisible] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
 
   const colorPreset = TEMPLATE_COLOR_PRESETS[colorIndex];
 
@@ -102,7 +112,7 @@ export default function EditTemplateScreen() {
     setFields((current) => [...current, createEmptyField(current.map((field) => field.key))]);
   };
 
-  const handleSave = async (navigateAfterSave = true): Promise<boolean> => {
+  const validateBeforeSave = (): boolean => {
     if (!template || !title.trim()) {
       showAppAlert(t('templates.enterTemplateName'));
       return false;
@@ -110,6 +120,22 @@ export default function EditTemplateScreen() {
 
     if (fields.some((field) => !field.label.trim())) {
       showAppAlert(t('templates.allFieldsNeedLabel'));
+      return false;
+    }
+
+    return true;
+  };
+
+  const finishAfterSave = (nextTemplateId?: string) => {
+    allowNavigation();
+    if (openedFromCreate && nextTemplateId && nextTemplateId !== id) {
+      setPendingCreateTemplateSwitch(nextTemplateId);
+    }
+    router.back();
+  };
+
+  const persistOverwrite = async (navigateAfterSave: boolean): Promise<boolean> => {
+    if (!template || !validateBeforeSave()) {
       return false;
     }
 
@@ -128,13 +154,91 @@ export default function EditTemplateScreen() {
         })
       );
       if (navigateAfterSave) {
-        allowNavigation();
-        router.back();
+        finishAfterSave();
       }
       return true;
     } finally {
       setSaving(false);
     }
+  };
+
+  const persistAsNew = async (name: string): Promise<boolean> => {
+    if (!template) {
+      return false;
+    }
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      showAppAlert(t('templates.enterTemplateName'));
+      return false;
+    }
+
+    if (fields.some((field) => !field.label.trim())) {
+      showAppAlert(t('templates.allFieldsNeedLabel'));
+      return false;
+    }
+
+    setSaving(true);
+
+    try {
+      const now = new Date().toISOString();
+      const newId = getNextCustomTemplateId();
+      await saveTemplate(
+        normalizeTemplate({
+          ...template,
+          id: newId,
+          title: trimmedName,
+          icon,
+          accentColor: colorPreset.accentColor,
+          gradientEnd: colorPreset.gradientEnd,
+          fields,
+          pdfStyle,
+          isBuiltIn: false,
+          createdAt: now,
+          updatedAt: now,
+        })
+      );
+      setNameDialogVisible(false);
+      finishAfterSave(newId);
+      return true;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = async (navigateAfterSave = true): Promise<boolean> => {
+    if (!validateBeforeSave()) {
+      return false;
+    }
+
+    if (openedFromCreate) {
+      return new Promise((resolve) => {
+        showAppAlert(t('templates.saveChoiceTitle'), t('templates.saveChoiceText'), [
+          {
+            text: t('common.cancel'),
+            style: 'cancel',
+            onPress: () => resolve(false),
+          },
+          {
+            text: t('templates.saveAsNewTemplate'),
+            style: 'secondary',
+            onPress: () => {
+              setNewTemplateName(title.trim());
+              setNameDialogVisible(true);
+              resolve(false);
+            },
+          },
+          {
+            text: t('templates.modifyThisTemplate'),
+            onPress: () => {
+              void persistOverwrite(navigateAfterSave).then(resolve);
+            },
+          },
+        ]);
+      });
+    }
+
+    return persistOverwrite(navigateAfterSave);
   };
 
   const hasChanges = useMemo(() => {
@@ -306,6 +410,45 @@ export default function EditTemplateScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={nameDialogVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNameDialogVisible(false)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.dialog}>
+            <Text style={styles.dialogTitle}>{t('templates.newTemplateNameTitle')}</Text>
+            <TextInput
+              value={newTemplateName}
+              onChangeText={setNewTemplateName}
+              placeholder={t('templates.newTemplateNamePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              autoFocus
+              selectTextOnFocus
+              style={styles.dialogInput}
+              onSubmitEditing={() => void persistAsNew(newTemplateName)}
+            />
+            <View style={styles.dialogActions}>
+              <PrimaryButton
+                label={t('common.cancel')}
+                variant="secondary"
+                onPress={() => setNameDialogVisible(false)}
+                disabled={saving}
+                style={styles.dialogButton}
+              />
+              <PrimaryButton
+                label={t('common.save')}
+                onPress={() => void persistAsNew(newTemplateName)}
+                loading={saving}
+                disabled={!newTemplateName.trim()}
+                style={styles.dialogButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -370,5 +513,45 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.background,
     },
     loadingText: { fontSize: 16, fontWeight: '600', color: colors.text },
+    dialogBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    dialog: {
+      width: '100%',
+      maxWidth: 420,
+      borderRadius: AppDesign.radius.xl,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: 18,
+      gap: 12,
+      ...AppDesign.shadow,
+    },
+    dialogTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    dialogInput: {
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: colors.text,
+      backgroundColor: colors.backgroundSoft,
+    },
+    dialogActions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    dialogButton: {
+      flex: 1,
+    },
   });
 }

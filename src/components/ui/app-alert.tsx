@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 
 export type AppAlertButton = {
   text: string;
-  style?: 'default' | 'cancel' | 'destructive';
+  style?: 'default' | 'cancel' | 'destructive' | 'secondary';
   onPress?: () => void | Promise<void>;
 };
 
@@ -90,6 +90,7 @@ export function AppAlertProvider({ children }: { children: ReactNode }) {
                   style={({ pressed }) => [
                     styles.button,
                     button.style === 'cancel' && styles.buttonCancel,
+                    button.style === 'secondary' && styles.buttonSecondary,
                     button.style === 'destructive' && styles.buttonDanger,
                     pressed && styles.buttonPressed,
                   ]}
@@ -98,6 +99,7 @@ export function AppAlertProvider({ children }: { children: ReactNode }) {
                     style={[
                       styles.buttonText,
                       button.style === 'cancel' && styles.buttonTextCancel,
+                      button.style === 'secondary' && styles.buttonTextSecondary,
                       button.style === 'destructive' && styles.buttonTextDanger,
                     ]}
                   >
@@ -175,6 +177,11 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       backgroundColor: colors.backgroundElement,
     },
+    buttonSecondary: {
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      backgroundColor: colors.primarySoft,
+    },
     buttonDanger: {
       backgroundColor: colors.dangerSoft,
       borderWidth: 1,
@@ -191,6 +198,9 @@ function createStyles(colors: ThemeColors) {
     },
     buttonTextCancel: {
       color: colors.textSecondary,
+    },
+    buttonTextSecondary: {
+      color: colors.primary,
     },
     buttonTextDanger: {
       color: colors.danger,

@@ -10,29 +10,48 @@ function cloneTemplate(template: DocumentTemplate): DocumentTemplate {
   return normalizeTemplate(template);
 }
 
+async function readSavedTemplates(): Promise<DocumentTemplate[]> {
+  const raw = await AsyncStorage.getItem(TEMPLATES_STORAGE_KEY);
+
+  if (!raw) {
+    return [];
+  }
+
+  return (JSON.parse(raw) as DocumentTemplate[]).map(cloneTemplate);
+}
+
+async function writeSavedTemplates(templates: DocumentTemplate[]): Promise<void> {
+  await AsyncStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+}
+
 export async function ensureTemplatesSeeded(): Promise<void> {
   const raw = await AsyncStorage.getItem(TEMPLATES_STORAGE_KEY);
 
   if (!raw) {
-    await AsyncStorage.setItem(
-      TEMPLATES_STORAGE_KEY,
-      JSON.stringify(getDefaultTemplates(getAppLocale()).map(cloneTemplate))
-    );
+    await writeSavedTemplates([]);
   }
 }
 
 export async function getTemplates(): Promise<DocumentTemplate[]> {
-  const raw = await AsyncStorage.getItem(TEMPLATES_STORAGE_KEY);
   const defaultTemplates = getDefaultTemplates(getAppLocale()).map(cloneTemplate);
+  const savedTemplates = await readSavedTemplates();
+  const savedById = new Map(savedTemplates.map((template) => [template.id, template]));
 
-  if (!raw) {
-    return defaultTemplates;
-  }
+  const builtinTemplates = defaultTemplates.map((defaultTemplate) => {
+    const saved = savedById.get(defaultTemplate.id);
+    if (!saved) {
+      return defaultTemplate;
+    }
 
-  const savedTemplates = (JSON.parse(raw) as DocumentTemplate[]).map(cloneTemplate);
+    return cloneTemplate({
+      ...saved,
+      isBuiltIn: true,
+    });
+  });
+
   const customTemplates = savedTemplates.filter((template) => !template.isBuiltIn);
 
-  return [...defaultTemplates, ...customTemplates];
+  return [...builtinTemplates, ...customTemplates];
 }
 
 export async function getTemplateById(templateId: string): Promise<DocumentTemplate | null> {
@@ -41,38 +60,34 @@ export async function getTemplateById(templateId: string): Promise<DocumentTempl
 }
 
 export async function saveTemplate(template: DocumentTemplate): Promise<void> {
-  const templates = await getTemplates();
-  const index = templates.findIndex((item) => item.id === template.id);
+  const savedTemplates = await readSavedTemplates();
   const now = new Date().toISOString();
-  const nextTemplate = {
+  const nextTemplate = cloneTemplate({
     ...template,
     createdAt: template.createdAt ?? now,
     updatedAt: now,
-  };
+  });
 
-  if (index === -1) {
-    await AsyncStorage.setItem(
-      TEMPLATES_STORAGE_KEY,
-      JSON.stringify([...templates, nextTemplate])
-    );
-    return;
-  }
+  const index = savedTemplates.findIndex((item) => item.id === template.id);
+  const updated =
+    index === -1
+      ? [...savedTemplates, nextTemplate]
+      : savedTemplates.map((item, itemIndex) =>
+          itemIndex === index ? nextTemplate : item
+        );
 
-  const updated = [...templates];
-  updated[index] = nextTemplate;
-  await AsyncStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
+  await writeSavedTemplates(updated);
 }
 
 export async function deleteTemplate(templateId: string): Promise<boolean> {
-  const templates = await getTemplates();
-  const template = templates.find((item) => item.id === templateId);
+  const savedTemplates = await readSavedTemplates();
+  const template = savedTemplates.find((item) => item.id === templateId);
 
   if (!template || template.isBuiltIn) {
     return false;
   }
 
-  const updated = templates.filter((item) => item.id !== templateId);
-  await AsyncStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(updated));
+  await writeSavedTemplates(savedTemplates.filter((item) => item.id !== templateId));
   return true;
 }
 
@@ -83,13 +98,13 @@ export async function resetTemplateToDefault(templateId: string): Promise<Docume
     return null;
   }
 
-  const restored = cloneTemplate({
+  const savedTemplates = await readSavedTemplates();
+  await writeSavedTemplates(savedTemplates.filter((item) => item.id !== templateId));
+
+  return cloneTemplate({
     ...defaultTemplate,
     updatedAt: new Date().toISOString(),
   });
-
-  await saveTemplate(restored);
-  return restored;
 }
 
 export function getNextCustomTemplateId(): string {

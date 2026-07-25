@@ -11,11 +11,19 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, router, Stack } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import * as Haptics from '@/lib/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
 import { showAppAlert } from '@/components/ui/app-alert';
+import { PrimaryButton } from '@/components/ui/primary-button';
 import { LanguagePickerModal } from '@/components/ui/language-picker-modal';
 import { SettingsPickerModal } from '@/components/ui/settings-picker-modal';
 import { AppDesign } from '@/constants/app-design';
@@ -30,6 +38,7 @@ import { useLayout } from '@/hooks/use-layout';
 import { getAppVersion, openFeedbackEmail, requestAppReview } from '@/lib/about-actions';
 import { clearAppCache } from '@/lib/clear-cache';
 import { clearAllDocuments } from '@/lib/clear-documents';
+import { clearAllTemplates } from '@/lib/clear-templates';
 import { pickCustomExportFolder } from '@/lib/export-folder';
 import type { ExportFileNameFormat } from '@/types/app-settings';
 import type { LocalePreference } from '@/types/locale-preference';
@@ -74,6 +83,23 @@ const THEME_OPTIONS: {
   },
 ];
 
+type StorageTarget = 'cache' | 'documents' | 'templates';
+
+const STORAGE_TARGETS: {
+  value: StorageTarget;
+  labelKey: 'settings.clearCache' | 'settings.clearDocuments' | 'settings.clearTemplates';
+}[] = [
+  { value: 'cache', labelKey: 'settings.clearCache' },
+  { value: 'documents', labelKey: 'settings.clearDocuments' },
+  { value: 'templates', labelKey: 'settings.clearTemplates' },
+];
+
+const EMPTY_STORAGE_SELECTION: Record<StorageTarget, boolean> = {
+  cache: true,
+  documents: false,
+  templates: false,
+};
+
 const FILE_NAME_OPTIONS: {
   value: ExportFileNameFormat;
   labelKey:
@@ -101,7 +127,39 @@ export default function SettingsScreen() {
   const [languageSheetOpen, setLanguageSheetOpen] = useState(false);
   const [fileNameSheetOpen, setFileNameSheetOpen] = useState(false);
   const [folderSheetOpen, setFolderSheetOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
+  const [storageSelection, setStorageSelection] =
+    useState<Record<StorageTarget, boolean>>(EMPTY_STORAGE_SELECTION);
+  const storageProgress = useSharedValue(0);
+  const storageHeight = useSharedValue(0);
   const appVersion = getAppVersion();
+  const selectedTargets = STORAGE_TARGETS.filter((option) => storageSelection[option.value]);
+  const storageChevronStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        rotate: `${interpolate(storageProgress.value, [0, 1], [0, 180])}deg`,
+      },
+    ],
+  }));
+  const storagePanelStyle = useAnimatedStyle(() => {
+    const progress = storageProgress.value;
+    return {
+      height: storageHeight.value * progress,
+      opacity: interpolate(progress, [0, 0.35, 1], [0, 1, 1]),
+    };
+  });
+
+  const toggleStorageOpen = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setStorageOpen((current) => {
+      const next = !current;
+      storageProgress.value = withTiming(next ? 1 : 0, {
+        duration: next ? 360 : 280,
+        easing: next ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      });
+      return next;
+    });
+  };
 
   const selectedLanguage = LANGUAGE_OPTIONS.find((option) => option.value === preference)!;
   const selectedLanguageLabel = t(selectedLanguage.labelKey);
@@ -147,8 +205,19 @@ export default function SettingsScreen() {
     });
   };
 
-  const handleClearDocuments = () => {
-    showAppAlert(t('settings.clearDocumentsConfirmTitle'), t('settings.clearDocumentsConfirmText'), [
+  const toggleStorageTarget = (target: StorageTarget) => {
+    void Haptics.selectionAsync();
+    setStorageSelection((current) => ({ ...current, [target]: !current[target] }));
+  };
+
+  const handleClearSelected = () => {
+    const targets = selectedTargets.map((option) => option.value);
+
+    if (targets.length === 0) {
+      return;
+    }
+
+    showAppAlert(t('settings.clearSelectedConfirmTitle'), t('settings.clearSelectedConfirmText'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -156,37 +225,24 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             setBusy(true);
-            await clearAllDocuments();
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            showAppAlert(t('settings.done'), t('settings.clearDocumentsDone'));
-          } catch (error) {
-            showAppAlert(
-              t('settings.title'),
-              error instanceof Error ? error.message : t('settings.clearDocuments')
-            );
-          } finally {
-            setBusy(false);
-          }
-        },
-      },
-    ]);
-  };
 
-  const handleClearCache = () => {
-    showAppAlert(t('settings.clearCacheConfirmTitle'), t('settings.clearCacheConfirmText'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('settings.clearCache'),
-        onPress: async () => {
-          try {
-            setBusy(true);
-            await clearAppCache();
+            if (targets.includes('cache')) {
+              await clearAppCache();
+            }
+            if (targets.includes('documents')) {
+              await clearAllDocuments();
+            }
+            if (targets.includes('templates')) {
+              await clearAllTemplates();
+            }
+
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            showAppAlert(t('settings.done'), t('settings.clearCacheDone'));
+            setStorageSelection(EMPTY_STORAGE_SELECTION);
+            showAppAlert(t('settings.done'), t('settings.clearSelectedDone'));
           } catch (error) {
             showAppAlert(
               t('settings.title'),
-              error instanceof Error ? error.message : t('settings.clearCache')
+              error instanceof Error ? error.message : t('settings.clearSelected')
             );
           } finally {
             setBusy(false);
@@ -350,22 +406,98 @@ export default function SettingsScreen() {
         </SettingsGroup>
 
         <SettingsGroup title={t('settings.sectionStorage')} styles={styles}>
-          <SettingsRow
-            label={t('settings.clearCache')}
-            icon={{ ios: 'flame.fill', android: 'cleaning_services', web: 'cleaning_services' }}
-            onPress={handleClearCache}
-            styles={styles}
-            colors={colors}
-          />
-          <View style={styles.divider} />
-          <SettingsRow
-            label={t('settings.clearDocuments')}
-            icon={{ ios: 'trash.fill', android: 'delete_forever', web: 'delete_forever' }}
-            onPress={handleClearDocuments}
-            destructive
-            styles={styles}
-            colors={colors}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: storageOpen }}
+            onPress={toggleStorageOpen}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+          >
+            <View style={styles.rowIcon}>
+              <SymbolView
+                name={{
+                  ios: 'trash.fill',
+                  android: 'cleaning_services',
+                  web: 'cleaning_services',
+                }}
+                size={18}
+                tintColor={colors.primary}
+              />
+            </View>
+            <Text style={styles.rowLabel} numberOfLines={1}>
+              {t('settings.storageCleanup')}
+            </Text>
+            {selectedTargets.length > 0 ? (
+              <View style={styles.selectionBadge}>
+                <Text style={styles.selectionBadgeText}>{selectedTargets.length}</Text>
+              </View>
+            ) : null}
+            <Animated.View style={storageChevronStyle}>
+              <SymbolView
+                name={{
+                  ios: 'chevron.down',
+                  android: 'expand_more',
+                  web: 'expand_more',
+                }}
+                size={18}
+                tintColor={colors.textMuted}
+              />
+            </Animated.View>
+          </Pressable>
+
+          <Animated.View
+            pointerEvents={storageOpen ? 'auto' : 'none'}
+            style={[styles.storagePanelWrap, storagePanelStyle]}
+          >
+            <View
+              style={styles.storagePanelMeasure}
+              onLayout={(event) => {
+                const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+                if (nextHeight > 0 && Math.abs(storageHeight.value - nextHeight) > 1) {
+                  storageHeight.value = nextHeight;
+                }
+              }}
+            >
+              <View style={styles.divider} />
+              <View style={styles.storagePanel}>
+                <Text style={styles.storageHint}>{t('settings.storageCleanupHint')}</Text>
+
+                {STORAGE_TARGETS.map((option) => {
+                  const checked = storageSelection[option.value];
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked }}
+                      onPress={() => toggleStorageTarget(option.value)}
+                      style={({ pressed }) => [styles.checkRow, pressed && styles.pressed]}
+                    >
+                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                        {checked ? (
+                          <SymbolView
+                            name={{ ios: 'checkmark', android: 'check', web: 'check' }}
+                            size={14}
+                            tintColor="#ffffff"
+                            weight="bold"
+                          />
+                        ) : null}
+                      </View>
+                      <Text style={[styles.checkLabel, checked && styles.checkLabelChecked]}>
+                        {t(option.labelKey)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+
+                <PrimaryButton
+                  label={t('common.clear')}
+                  variant="danger"
+                  onPress={handleClearSelected}
+                  disabled={selectedTargets.length === 0 || busy}
+                />
+              </View>
+            </View>
+          </Animated.View>
         </SettingsGroup>
 
         <SettingsGroup title={t('settings.about')} styles={styles}>
@@ -660,6 +792,74 @@ function createStyles(colors: ThemeColors) {
       height: StyleSheet.hairlineWidth,
       backgroundColor: colors.border,
       marginLeft: 60,
+    },
+    selectionBadge: {
+      minWidth: 22,
+      height: 22,
+      paddingHorizontal: 6,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primarySoft,
+    },
+    selectionBadgeText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.primary,
+    },
+    storagePanelWrap: {
+      overflow: 'hidden',
+    },
+    storagePanelMeasure: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+    },
+    storagePanel: {
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 14,
+      gap: 10,
+    },
+    storageHint: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.textSecondary,
+    },
+    checkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      minHeight: 46,
+      paddingHorizontal: 12,
+      borderRadius: AppDesign.radius.md,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundSoft,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 7,
+      borderWidth: 2,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    checkboxChecked: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    checkLabel: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    checkLabelChecked: {
+      color: colors.text,
     },
     themeBlock: {
       paddingHorizontal: 14,

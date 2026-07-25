@@ -7,6 +7,7 @@ export type TranslationSchema = {
     navigationMenu: string;
     mainMenu: string;
     documentLibrary: string;
+    editTemplate: string;
     saveChangesTitle: string;
     saveChangesText: string;
     discardChanges: string;
@@ -14,6 +15,7 @@ export type TranslationSchema = {
     save: string;
     back: string;
     delete: string;
+    clear: string;
     edit: string;
     open: string;
     create: string;
@@ -105,6 +107,12 @@ export type TranslationSchema = {
     minOneField: string;
     allFieldsNeedLabel: string;
     enterTemplateName: string;
+    saveChoiceTitle: string;
+    saveChoiceText: string;
+    saveAsNewTemplate: string;
+    modifyThisTemplate: string;
+    newTemplateNameTitle: string;
+    newTemplateNamePlaceholder: string;
     unknownType: string;
     fieldLabel: string;
     placeholderLabel: string;
@@ -279,6 +287,13 @@ export type TranslationSchema = {
     clearCacheConfirmTitle: string;
     clearCacheConfirmText: string;
     clearCacheDone: string;
+    clearTemplates: string;
+    storageCleanup: string;
+    storageCleanupHint: string;
+    clearSelected: string;
+    clearSelectedConfirmTitle: string;
+    clearSelectedConfirmText: string;
+    clearSelectedDone: string;
     done: string;
     about: string;
     version: string;

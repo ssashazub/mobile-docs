@@ -145,7 +145,7 @@ export default function CreateTemplateScreen() {
       await saveTemplate(template);
       if (navigateAfterSave) {
         allowNavigation();
-        router.replace(`/templates/edit/${template.id}` as Href);
+        router.replace(`/create/${template.id}` as Href);
       }
       return true;
     } finally {
