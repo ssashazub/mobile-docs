@@ -7,11 +7,13 @@
 
 ## Что делает приложение
 
-1. **Документы** - создаёшь по шаблону, заполняешь поля, смотришь, редактируешь, экспортируешь PDF.
-2. **Шаблоны** - встроенные (Договор, Рахунок, Звіт, Акт) + свои кастомные. Настраиваются поля, цвет, вид PDF.
-3. **Локализация** - украинский, русский, английский (по языку системы).
-4. **Импорт PDF** - свои документы и сторонние PDF-формы.
-5. **Хранение** - всё локально в AsyncStorage на устройстве.
+1. **Документы** - создаёшь по шаблону, заполняешь поля, смотришь превью, редактируешь, печатаешь / сохраняешь / шаришь PDF.
+2. **Шаблоны** - встроенные (Договор, Рахунок, Звіт, Акт) + свои кастомные. Настраиваются поля, иконка, цвет, вид PDF.
+3. **Локализация** - украинский, русский, английский (система или вручную в настройках).
+4. **Тема** - светлая / тёмная / как на устройстве (в настройках).
+5. **Импорт PDF** - свои документы и сторонние PDF-формы (поля, checkbox, radio).
+6. **Настройки** - язык, тема, вибрация, папка экспорта, формат имени файла, очистка, About.
+7. **Хранение** - всё локально в AsyncStorage (+ файлы PDF в файловой системе устройства).
 
 ---
 
@@ -19,17 +21,22 @@
 
 | Маршрут | Файл | Что видит пользователь |
 |---------|------|------------------------|
-| `/` | `src/app/index.tsx` | Главная: список документов, кнопки «Создать» и «Шаблоны» |
-| `/create` | `src/app/create/index.tsx` | Шаг 1: выбор шаблона для нового документа |
-| `/create/[templateId]` | `src/app/create/[templateId].tsx` | Шаг 2: поля + вид PDF + кнопка «Создать документ» |
-| `/document/[id]` | `src/app/document/[id].tsx` | Просмотр документа + экспорт PDF |
+| `/` | `src/app/index.tsx` | Главная: создать / импорт / шаблоны, последние документы, настройки |
+| `/documents` | `src/app/documents/index.tsx` | Библиотека всех документов |
+| `/create` | `src/app/create/index.tsx` | Шаг 1: выбор шаблона |
+| `/create/[templateId]` | `src/app/create/[templateId].tsx` | Шаг 2: поля + вид PDF → превью |
+| `/document/[id]` | `src/app/document/[id].tsx` | Просмотр полей документа |
 | `/document/edit/[id]` | `src/app/document/edit/[id].tsx` | Редактирование документа + вид PDF |
+| `/document/preview/[id]` | `src/app/document/preview/[id].tsx` | Превью PDF: Save PDF / More |
 | `/templates` | `src/app/templates/index.tsx` | Список всех шаблонов |
 | `/templates/create` | `src/app/templates/create.tsx` | Создание своего шаблона |
 | `/templates/edit/[id]` | `src/app/templates/edit/[id].tsx` | Редактирование шаблона |
 | `/pdf-styles` | `src/app/pdf-styles/index.tsx` | Сохранённые PDF-стили |
+| `/settings` | `src/app/settings/index.tsx` | Настройки |
+| `/settings/privacy` | `src/app/settings/privacy.tsx` | Политика конфиденциальности |
+| `/settings/terms` | `src/app/settings/terms.tsx` | Условия пользования |
 
-Общая навигация и заголовки шапки: `src/app/_layout.tsx`
+Общая навигация, splash и провайдеры: `src/app/_layout.tsx`
 
 ---
 
@@ -40,10 +47,11 @@ src/
 ├── app/                  # Экраны (Expo Router - файл = маршрут)
 ├── core/                 # ★ Ядро: шаблоны и PDF (без UI)
 ├── components/           # UI-компоненты
-├── constants/            # Константы, дефолты, дизайн
+├── constants/            # Константы, дефолты, дизайн, layout
+├── contexts/             # Тема, язык, app settings
 ├── hooks/                # React-хуки приложения
 ├── i18n/                 # Переводы uk / ru / en
-├── lib/                  # Логика: хранение, импорт, хелперы
+├── lib/                  # Логика: хранение, импорт, экспорт, хелперы
 └── types/                # TypeScript-типы
 ```
 
@@ -191,6 +199,8 @@ npx tsc --noEmit
 
 Константа `CommonFieldKeys` в `field-def.ts` - список типичных ключей для единообразия.
 
+**Валидация в UI:** при ошибке поле подсвечивается красной рамкой, экран скроллится к нему и трясётся (`useFieldFocusOnError`). Дата в формате `ДД.ММ.ГГГГ` (например `07.06.2026`).
+
 ---
 
 ## PDF-ядро: как устроена сборка
@@ -249,57 +259,73 @@ export-pdf.ts → expo-print → PDF
 ## Экраны - `src/app/`
 
 ### `index.tsx` - главная
-- Загружает документы и шаблоны при каждом фокусе экрана.
-- Показывает карточки документов (`DocumentCard`).
-- Долгое нажатие на документ → меню (открыть / редактировать / удалить) через `ActionSheet`.
-- **Править:** текст кнопок, пустое состояние, внешний вид списка.
+- Карточки действий: создать документ, импорт PDF, шаблоны.
+- Кнопка настроек (Material-иконка).
+- Телефон: до **3** последних документов; кнопка «Смотреть все» если больше 3.
+- Планшет: все документы в колонке; «Смотреть все» если не влезают по высоте.
+- Долгое нажатие → ActionSheet (открыть / редактировать / удалить).
+- Пустое состояние: анимация иконок типов документов.
+- **Править:** компактность карточек, сетку планшета, empty-state.
+
+### `documents/index.tsx` - библиотека документов
+- Полный список документов (новые сверху).
+- То же долгое нажатие и действия, что на главной.
+- **Править:** сортировку, пустое состояние списка.
 
 ### `create/index.tsx` - выбор шаблона (шаг 1)
 - Список шаблонов (`DocumentTypeCard`).
-- Кнопка «Керувати шаблонами» → `/templates`.
+- Меню «⋯» (`EditorOverflowMenu`): главное меню / библиотека.
 - **Править:** заголовки, подписи, список шаблонов.
 
 ### `create/[templateId].tsx` - форма нового документа (шаг 2)
-- Загружает шаблон по `templateId`.
-- Поля формы (`FormField`) из шаблона.
-- Выбор вида PDF (`PdfLayoutPicker`) - сохраняется в документ.
-- Сохраняет документ через `addDocument()`.
-- **Править:** логику создания, валидацию обязательных полей, расположение блоков.
+- Поля формы + вид PDF (`PdfLayoutPicker`).
+- Валидация + фокус на ошибочном поле.
+- Guard несохранённых изменений (`useUnsavedChangesGuard`).
+- После сохранения → `/document/preview/[id]`.
+- **Править:** логику создания, валидацию, layout формы.
 
-### `document/[id].tsx` - просмотр документа
-- Показывает все поля документа.
-- Кнопка «Экспорт PDF» → `exportDocumentPdf()`.
-- Кнопка Edit в шапке → редактирование.
-- **Править:** внешний вид карточки, кнопку экспорта.
+### `document/[id].tsx` - просмотр полей
+- Показывает поля документа.
+- Переход в редактирование / превью.
+- **Править:** внешний вид карточки полей.
 
-### `document/edit/[id].tsx` - редактирование документа
-- Загружает документ + шаблон.
-- Редактируемые поля + вид PDF.
-- Сохраняет через `updateDocument()`.
-- **Править:** валидацию, поля, сохранение.
+### `document/edit/[id].tsx` - редактирование
+- Поля + вид PDF, guard при выходе с изменениями.
+- Меню «⋯».
+- **Править:** валидацию, сохранение.
+
+### `document/preview/[id].tsx` - превью PDF ★
+- WebView с HTML/PDF превью (на планшете — «лист» по центру).
+- Кнопки: **Save PDF** (share/сохранение) и **More**.
+- More: печать, Save to library → `/documents`, переименовать, редактировать.
+- **Править:** набор действий, chrome превью, диалог переименования.
 
 ### `templates/index.tsx` - список шаблонов
-- Все шаблоны (встроенные + кастомные).
-- Кнопка «+ Создать шаблон».
-- Удаление только кастомных шаблонов.
-- **Править:** список, кнопку создания, удаление.
+- Встроенные + кастомные; удаление только кастомных.
+- **Править:** список, кнопку создания.
 
-### `templates/create.tsx` - создание шаблона
-- Выбор основы (пустой / существующий шаблон).
-- Название, эмодзі, цвет.
-- Вид PDF (`PdfLayoutPicker`).
-- Редактор полей (`TemplateFieldEditor`).
-- Сохраняет через `saveTemplate()`.
-- **Править:** дефолтные поля при создании, форму, валидацию.
+### `templates/create.tsx` / `templates/edit/[id].tsx`
+- Основа, название, иконка (`TemplateIconPicker`), цвет, PDF-стиль, поля.
+- Для встроенных: «Скинути до стандарту».
+- Меню «⋯» + guard несохранённых изменений.
+- **Править:** дефолты, форму, сброс.
 
-### `templates/edit/[id].tsx` - редактирование шаблона
-- То же, что create, но для существующего шаблона.
-- Для встроенных шаблонов - кнопка «Скинути до стандарту» (`resetTemplateToDefault`).
-- **Править:** поля шаблона, PDF-стиль, сброс встроенных.
+### `settings/index.tsx` - настройки
+Секции:
+- **General** — язык, тема, вибрация (haptics)
+- **Export** — папка сохранения, формат имени файла
+- **Storage** — очистить кеш, удалить документы
+- **About** — версия, privacy, terms, feedback, rate app
+- **Править:** иерархию секций, модалки выбора (`LanguagePickerModal`, `SettingsPickerModal`).
+
+### `settings/privacy.tsx` / `settings/terms.tsx`
+- Юридические тексты через `components/legal-screen.tsx`.
 
 ### `_layout.tsx` - корневой layout
-- Stack-навигация, цвет шапки, заголовки основных экранов.
-- **Править:** глобальные заголовки, стиль header.
+- Провайдеры: тема → язык → app settings → AppAlert → Stack.
+- Splash скрывается только после гидрации настроек (без мигания тёмной темы).
+- Ориентация: телефон — portrait lock; планшет — unlock.
+- **Править:** заголовки Stack, orientation, порядок провайдеров.
 
 ---
 
@@ -309,21 +335,55 @@ export-pdf.ts → expo-print → PDF
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
-| `document-card.tsx` | Карточка документа на главной | Внешний вид списка на главной |
-| `document-type-card.tsx` | Карточка шаблона (выбор типа) | Внешний вид при выборе шаблона |
-| `pdf-layout-picker.tsx` | Выбор макета PDF (8 пресетов + конструктор + свои стили) | Новый макет, превью, сохранённые стили |
-| `pdf-style-constructor.tsx` | Конструктор PDF: заголовок, поля, шрифт, цвета | Новые опции кастомного стиля |
-| `validated-form-field.tsx` | Поле ввода с валидацией по типу (дата, число…) | Типы полей, фильтрация ввода |
-| `pdf-form-field.tsx` | Поле импортированной PDF-формы (checkbox, radio…) | Импорт PDF |
-| `template-field-editor.tsx` | Редактор одного поля шаблона | Поля в редакторе шаблонов |
+| `document-card.tsx` | Карточка документа | Список на главной / в библиотеке |
+| `document-type-card.tsx` | Карточка шаблона | Выбор типа документа |
+| `pdf-layout-picker.tsx` | Макеты PDF + свои стили | Новый макет, выделение выбранного стиля |
+| `pdf-style-constructor.tsx` | Конструктор PDF | Новые опции кастомного стиля |
+| `validated-form-field.tsx` | Поле с валидацией + shake | Типы полей, красная рамка |
+| `pdf-form-field.tsx` | Поле импортированной PDF-формы | Импорт PDF |
+| `template-field-editor.tsx` | Редактор поля шаблона | Поля в редакторе шаблонов |
+| `template-icon-picker.tsx` | Выбор иконки шаблона (symbol / emoji / none) | Набор иконок |
+| `template-icon-view.tsx` | Отображение иконки шаблона | UI иконок |
+| `legal-screen.tsx` | Общий layout для privacy/terms | Юридические экраны |
 
 ### UI - `src/components/ui/`
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
-| `primary-button.tsx` | Основная кнопка (primary / secondary) | Стиль кнопок по всему приложению |
-| `form-field.tsx` | Поле ввода с подписью | Стиль полей в формах документов |
-| `action-sheet.tsx` | Нижнее меню действий (долгое нажатие) | Меню на главной |
+| `primary-button.tsx` | Основная кнопка | Стиль кнопок |
+| `form-field.tsx` | Поле ввода с подписью | Стиль полей |
+| `action-sheet.tsx` | Нижнее меню действий | Long-press, More на превью |
+| `app-alert.tsx` | Стилизованные диалоги (`showAppAlert`) | Подтверждения, ошибки |
+| `editor-overflow-menu.tsx` | Меню «⋯» в редакторах | Навигация домой / в библиотеку |
+| `language-picker-modal.tsx` | Выбор языка в настройках | Список языков |
+| `settings-picker-modal.tsx` | Универсальный пикер настроек | Тема, формат имени и т.д. |
+| `theme-switcher.tsx` | Переключатель темы (если ещё где-то используется) | UI темы |
+| `loading-state.tsx` | Экран загрузки | Превью / async экраны |
+
+---
+
+## Контексты - `src/contexts/`
+
+| Файл | За что отвечает |
+|------|-----------------|
+| `theme-preference-context.tsx` | light / dark / system + гидрация |
+| `locale-preference-context.tsx` | system / uk / ru / en |
+| `app-settings-context.tsx` | папка экспорта, имя файла, haptics |
+
+Хранение предпочтений: `lib/theme-preference-storage.ts`, `lib/locale-preference-storage.ts`, `lib/app-settings-storage.ts`.
+
+---
+
+## Хуки - `src/hooks/`
+
+| Файл | За что отвечает |
+|------|-----------------|
+| `use-i18n.ts` | `t()`, `pluralDocuments()`, текущая локаль |
+| `use-theme.ts` | Цвета текущей темы |
+| `use-layout.ts` | Телефон / планшет, колонки, `contentStyle` / `gridStyle` |
+| `use-unsaved-changes-guard.ts` | Диалог «Сохранить изменения?» при уходе |
+| `use-field-focus-on-error.ts` | Скролл + shake обязательного поля |
+| `use-modal-sheet-animation.ts` | Анимация bottom sheets |
 
 ---
 
@@ -331,16 +391,28 @@ export-pdf.ts → expo-print → PDF
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
-| `document-storage.ts` | CRUD документов в AsyncStorage (`getDocuments`, `addDocument`, `updateDocument`, `deleteDocument`) | Как сохраняются документы |
+| `document-storage.ts` | CRUD документов | Как сохраняются документы |
 | `template-storage.ts` | CRUD шаблонов | Как сохраняются шаблоны |
 | `pdf-style-storage.ts` | CRUD сохранённых PDF-стилей | Свои стили из конструктора |
-| `pdf-style-resolver.ts` | Слияние пресета макета и кастомного design | Логика конструктора PDF |
-| `field-validation.ts` | Валидация полей (дата, число, email…) | Правила ввода |
-| `document-helpers.ts` | Сборка документа из полей | Логика title/client/description |
-| `template-helpers.ts` | Пустой шаблон, нормализация PDF-стиля | Дефолты при создании шаблона |
-| `pdf-templates.ts` | Re-export → `core/pdf/render.ts` | Совместимость; правки - в `core/pdf/` |
-| `export-pdf.ts` | Генерация PDF + Share | Имя файла, ошибки экспорта |
+| `pdf-style-resolver.ts` | Слияние пресета и design | Логика конструктора PDF |
+| `field-validation.ts` | Валидация полей | Правила ввода (дата через точку и т.д.) |
+| `field-validation-alert.ts` | Алерты ошибок валидации | Текст ошибок |
+| `document-helpers.ts` | Сборка документа из полей | title / client / description |
+| `document-display.ts` | Резолв шаблона для документа, imported-form | Карточки, превью |
+| `template-helpers.ts` | Пустой шаблон, нормализация PDF-стиля | Дефолты шаблона |
+| `template-icon.ts` | symbol / emoji / none хелперы | Иконки шаблонов |
+| `pdf-templates.ts` | Re-export → `core/pdf/render.ts` | Совместимость |
+| `export-pdf.ts` | prepare / print / share PDF | Экспорт и превью |
+| `export-file-name.ts` | Имя файла по настройке | Форматы имени |
+| `export-folder.ts` | Папка экспорта (app / custom SAF) | Куда писать PDF |
 | `import-pdf.ts` | Импорт PDF (свой / сторонний) | Импорт форм |
+| `pdf-form.ts` | Применение значений к AcroForm | Импортированные формы |
+| `pdf-metadata.ts` | Метаданные в PDF | Распознавание «своих» PDF |
+| `pdf-bytes.ts` | base64 ↔ bytes | Низкоуровневая работа с PDF |
+| `pdf-file-storage.ts` | Файлы оригинальных PDF на диске | Хранение импортов |
+| `clear-cache.ts` / `clear-documents.ts` | Очистка из настроек | Storage-секция |
+| `haptics.ts` | Обёртка expo-haptics с вкл/выкл | Вибрация |
+| `about-actions.ts` | Версия, feedback email, rate app | About |
 
 ---
 
@@ -348,10 +420,15 @@ export-pdf.ts → expo-print → PDF
 
 | Файл | Содержимое |
 |------|------------|
-| `document.ts` | `Document` - id, title, templateId, client, description, fields, pdfStyle?, createdAt |
-| `template.ts` | `DocumentTemplate`, `TemplateField`, `PdfStyle`, `PdfLayout` |
+| `document.ts` | `Document` (+ `source`, `formFields`, `originalPdfUri` для импорта) |
+| `template.ts` | `DocumentTemplate` с `icon: TemplateIcon`, `PdfStyle`, `PdfLayout` |
+| `pdf-style-design.ts` | Design-токены конструктора PDF |
+| `field-validation.ts` | `FieldInputKind`, ошибки валидации |
+| `app-settings.ts` | Папка экспорта, формат имени, haptics |
+| `theme-preference.ts` | `light` \| `dark` \| `system` |
+| `locale-preference.ts` | `system` \| `uk` \| `ru` \| `en` |
 
-**Править**, если добавляешь новые поля в документ или шаблон (и потом обновить storage + экраны).
+**Править**, если добавляешь новые поля в документ/шаблон/настройки (и потом storage + экраны).
 
 ---
 
@@ -359,11 +436,16 @@ export-pdf.ts → expo-print → PDF
 
 | Файл | За что отвечает | Когда править |
 |------|-----------------|---------------|
-| `storage.ts` | Ключи AsyncStorage: `documents`, `document_templates` | Только при смене ключей хранения |
+| `storage.ts` | Ключи AsyncStorage | Новые ключи хранения |
 | `default-templates.ts` | Re-export → `core/templates` | Совместимость |
-| `pdf-layouts.ts` | 8 макетов, пресеты design, дефолты PDF | Новый макет или пресет |
-| `template-colors.ts` | Палитра цветов для кастомных шаблонов (6 пресетов) | Добавить/изменить цвета |
-| `app-design.ts` | Цвета, радиусы, тени UI приложения | **Глобальный дизайн** приложения |
+| `pdf-layouts.ts` | 8 макетов, пресеты design | Новый макет / пресет |
+| `template-colors.ts` | Палитра цветов шаблонов | Цвета |
+| `template-icons.ts` | Пресеты Material/SF Symbol иконок | Новые иконки шаблонов |
+| `app-design.ts` | Радиусы, тени UI | Глобальный вид |
+| `layout.ts` | Breakpoints планшета, max widths | Адаптив |
+| `theme.ts` | Палитры light/dark | Цвета темы |
+| `app-info.ts` | Email feedback и т.п. | About |
+| `pdf-page.ts` / `imported-pdf.ts` | Размеры страницы, константы импорта | PDF |
 
 ---
 
@@ -371,19 +453,20 @@ export-pdf.ts → expo-print → PDF
 
 | Файл | За что отвечает |
 |------|-----------------|
-| `index.ts` | Выбор языка (uk/ru), функции `t()`, `pluralDocuments()` |
-| `types.ts` | TypeScript-схема всех строк перевода |
+| `index.ts` | `resolveAppLocale()`, `t()`, `pluralDocuments()`, override языка |
+| `types.ts` | TypeScript-схема всех строк |
 | `locales/uk.ts` | Украинские тексты |
 | `locales/ru.ts` | Русские тексты |
+| `locales/en.ts` | Английские тексты |
 
-Хук для экранов: `src/hooks/use-i18n.ts` → `const { t } = useI18n()`
+Хук: `src/hooks/use-i18n.ts` → `const { t } = useI18n()`
 
-**Править тексты в UI:**
-1. Добавь ключ в `types.ts`
-2. Добавь строку в `uk.ts` и `ru.ts`
-3. Используй `t('section.key')` на экране
+**Править тексты:**
+1. Ключ в `types.ts`
+2. Строка в `uk.ts`, `ru.ts`, `en.ts`
+3. `t('section.key')` на экране
 
-Секции переводов: `home`, `create`, `templates`, `document`, `common`, `pdf`
+Секции: `common`, `home`, `create`, `templates`, `document`, `pdf`, `settings`, `theme`, `import`, …
 
 ---
 
@@ -391,16 +474,54 @@ export-pdf.ts → expo-print → PDF
 
 ```
 AsyncStorage
-├── documents          → Document[]
-├── document_templates → кастомные шаблоны (встроенные - из core)
-└── pdf_styles         → сохранённые PDF-стили конструктора
+├── documents            → Document[]
+├── document_templates   → кастомные шаблоны (встроенные - из core)
+├── pdf_styles           → сохранённые PDF-стили конструктора
+├── theme_preference     → light | dark | system
+├── locale_preference    → system | uk | ru | en
+└── app_settings         → папка экспорта, имя файла, haptics
+
+Файловая система
+└── оригиналы импортированных PDF (pdf-file-storage)
 ```
 
 - Встроенные шаблоны **не хранятся** - собираются из `core/templates/definitions/` при каждом `getTemplates()`.
-- Документы хранят `templateId` + `fields` + опционально свой `pdfStyle`.
-- Шаблоны хранят `fields`, `pdfStyle`, цвета, emoji.
+- Документы хранят `templateId` + `fields` + опционально `pdfStyle` / данные импорта.
+- Шаблоны хранят `fields`, `pdfStyle`, цвета, `icon` (emoji deprecated, синхронизируется для PDF).
 
-**Не сохранять данные через `useEffect` на главной** - только через `document-storage` / `template-storage`.
+**Не сохранять данные через `useEffect` на главной** - только через storage-модули.
+
+---
+
+## Настройки и предпочтения
+
+```
+Settings screen
+├── General
+│   ├── Language     → locale-preference-context
+│   ├── Theme        → theme-preference-context
+│   └── Haptics      → app_settings.hapticsEnabled → lib/haptics.ts
+├── Export
+│   ├── Save folder  → app | custom (SAF)
+│   └── File naming  → title | title_date | date_title | id_title
+├── Storage
+│   ├── Clear cache
+│   └── Delete documents
+└── About
+    ├── Version / Privacy / Terms
+    └── Feedback / Rate app
+```
+
+---
+
+## Адаптив (телефон / планшет)
+
+- Токены: `constants/layout.ts` (`tabletMinWidth: 768`, `largeTabletMinWidth: 1024`).
+- Хук: `hooks/use-layout.ts` → `isTablet`, `columns` (1/2/3), `contentStyle`, `gridStyle`.
+- Ориентация (`_layout.tsx` + `expo-screen-orientation` в `app.json`):
+  - телефон — lock `PORTRAIT_UP`
+  - планшет — unlock (все ориентации)
+- Превью PDF на планшете — центрированный «лист» (`Layout.previewPageMaxWidth`).
 
 ---
 
@@ -412,6 +533,7 @@ AsyncStorage
 - UI: `pdf-layout-picker.tsx`, `pdf-style-constructor.tsx`
 - Дефолты: `constants/pdf-layouts.ts`
 - Рендер: `core/pdf/`
+- Экспорт/превью: `lib/export-pdf.ts` (`prepareDocumentPdf`, `printPreparedPdf`, `sharePreparedPdf`)
 
 ---
 
@@ -420,31 +542,31 @@ AsyncStorage
 | Задача | Файлы |
 |--------|-------|
 | **Новый встроенный шаблон** | `core/templates/definitions/*.ts` → `definitions/index.ts` |
-| Поля встроенного шаблона | Тот же файл definition (через `defineField`) |
+| Поля встроенного шаблона | Тот же файл definition (`defineField`) |
+| Иконка шаблона | `constants/template-icons.ts`, `template-icon-picker.tsx` |
 | Вид PDF (HTML/CSS) | `core/pdf/parts/*`, `core/pdf/styles.ts` |
 | Новый пресет макета PDF | `constants/pdf-layouts.ts` + i18n |
 | Конструктор PDF в UI | `components/pdf-style-constructor.tsx` |
-| Текст на экране | `i18n/locales/uk.ts`, `ru.ts`, `types.ts` |
-| Цвета / отступы UI | `constants/app-design.ts` |
-| Главная страница | `app/index.tsx`, `components/document-card.tsx` |
-| Создание документа | `app/create/index.tsx`, `app/create/[templateId].tsx` |
-| Просмотр / экспорт PDF | `app/document/[id].tsx`, `lib/export-pdf.ts` |
+| Текст на экране | `i18n/locales/{uk,ru,en}.ts`, `types.ts` |
+| Цвета темы / UI | `constants/theme.ts`, `constants/app-design.ts` |
+| Главная | `app/index.tsx`, `components/document-card.tsx` |
+| Библиотека документов | `app/documents/index.tsx` |
+| Создание документа | `app/create/*` |
+| Превью / Save PDF / More | `app/document/preview/[id].tsx`, `lib/export-pdf.ts` |
 | Редактирование документа | `app/document/edit/[id].tsx` |
-| Список шаблонов | `app/templates/index.tsx` |
-| Создание шаблона | `app/templates/create.tsx` |
-| Редактирование шаблона | `app/templates/edit/[id].tsx` |
-| Поля встроенных шаблонов (Договор и т.д.) | `core/templates/definitions/` |
-| Редактор поля шаблона | `components/template-field-editor.tsx` |
-| Вид PDF (макеты) | `core/pdf/`, `constants/pdf-layouts.ts`, `components/pdf-layout-picker.tsx` |
-| Выбор макета PDF в форме | `create/[templateId].tsx`, `templates/create.tsx`, `templates/edit/[id].tsx` |
+| Шаблоны | `app/templates/*` |
+| Настройки | `app/settings/*`, `contexts/*`, `types/app-settings.ts` |
+| Меню «⋯» | `components/ui/editor-overflow-menu.tsx` |
+| Диалоги | `components/ui/app-alert.tsx` |
+| Несохранённые изменения | `hooks/use-unsaved-changes-guard.ts` |
+| Валидация + shake поля | `lib/field-validation.ts`, `hooks/use-field-focus-on-error.ts` |
+| Планшетный layout | `constants/layout.ts`, `hooks/use-layout.ts` |
+| Ориентация экрана | `app/_layout.tsx`, `app.json` (plugin) |
+| Вибрация | `lib/haptics.ts`, настройки |
 | Сохранение документов | `lib/document-storage.ts` |
 | Сохранение шаблонов | `lib/template-storage.ts` |
-| Новое поле в типе документа | `types/document.ts` → `document-helpers.ts` → экраны |
-| Новое поле в типе шаблона | `types/template.ts` → storage → экраны шаблонов |
-| Заголовки навигации | `app/_layout.tsx` + ключи в `i18n` |
-| Кнопки | `components/ui/primary-button.tsx` |
-| Поля ввода | `components/ui/form-field.tsx` |
-| Меню долгого нажатия | `components/ui/action-sheet.tsx` |
+| Импорт PDF | `lib/import-pdf.ts`, `lib/pdf-form.ts` |
+| Заголовки навигации | `app/_layout.tsx` + i18n |
 
 ---
 
@@ -452,43 +574,57 @@ AsyncStorage
 
 ### Создать документ
 ```
-Главная → /create → выбрать шаблон → /create/[id] → заполнить + вид PDF → сохранить
-→ /document/[id]
+Главная → /create → шаблон → /create/[id] → поля + PDF
+→ сохранить → /document/preview/[id]
+→ Save PDF | More (печать / библиотека / переименовать / редактировать)
+```
+
+### Библиотека документов
+```
+Главная → «Смотреть все» (или More → Save to library)
+→ /documents → открыть / редактировать / удалить
 ```
 
 ### Создать свой шаблон
 ```
-Шаблоны → /templates/create → выбрать основу → настроить поля + PDF → сохранить
+Шаблоны → /templates/create → основа → иконка + поля + PDF → сохранить
 → /templates/edit/[id]
 ```
 
 ### Изменить встроенный шаблон
 ```
-Шаблоны → нажать на шаблон → /templates/edit/[id] → сохранить
+Шаблоны → /templates/edit/[id] → сохранить
 (или «Скинути» для возврата к дефолту)
 ```
 
-### Экспорт PDF
+### Настройки
 ```
-/document/[id] → кнопка «Експорт PDF» → системное меню «Поделиться»
+Главная → иконка настроек → /settings
+→ язык / тема / вибрация / экспорт / очистка / about
+```
+
+### Импорт PDF
+```
+Главная → Импорт PDF → выбор файла → поля формы → редактирование → экспорт
 ```
 
 ---
 
 ## Файлы, которые можно не трогать
 
-Это системные / шаблонные файлы Expo, не относятся к логике Mobile Docs:
+Системные / шаблонные файлы Expo, не относятся к логике Mobile Docs:
 
 - `src/app/explore.tsx`
 - `src/components/themed-text.tsx`, `themed-view.tsx`
 - `src/components/animated-icon.*`, `app-tabs.*`, `web-badge.tsx`
 - `src/components/hint-row.tsx`, `external-link.tsx`, `ui/collapsible.tsx`
-- `src/constants/theme.ts` (тема Expo-шаблона, не основной дизайн)
-- `src/hooks/use-color-scheme.*`, `use-theme.ts`
+- `src/hooks/use-color-scheme.*` (низкоуровнево; предпочтения темы — через context)
 - `src/global.css`, `*.module.css`
-- `scripts/`, `assets/`, `app.json`, `package.json`
+- `scripts/`, `assets/`
 
-Основной дизайн приложения - **`constants/app-design.ts`**, не `theme.ts`.
+`app.json` / `package.json` трогать только при плагинах (orientation, sharing и т.п.) или зависимостях.
+
+Основной дизайн приложения - **`constants/app-design.ts`** + **`constants/theme.ts`**.
 
 ---
 
@@ -512,11 +648,19 @@ TypeScript-проверка: `npx tsc --noEmit`
 | Фича | Пакет |
 |------|-------|
 | Хранение | `@react-native-async-storage/async-storage` |
-| PDF | `expo-print`, `expo-sharing`, `expo-file-system` |
+| PDF генерация / печать | `expo-print`, `expo-sharing`, `expo-file-system` |
+| PDF формы / метаданные | `pdf-lib` |
+| Превью HTML | `react-native-webview` |
+| Импорт файла | `expo-document-picker` |
 | Градиенты | `expo-linear-gradient` |
 | Язык системы | `expo-localization` |
+| Иконки Material / SF | `expo-symbols` |
+| Вибрация | `expo-haptics` (через `lib/haptics.ts`) |
+| Ориентация | `expo-screen-orientation` |
 | Навигация | `expo-router` |
+| Анимации | `react-native-reanimated` |
+| Оценка приложения | `expo-store-review` |
 
 ---
 
-*Документ актуален для структуры `src/` проекта mobile-docs (Expo SDK 56). Ядро: `src/core/`.*
+*Документ актуален для структуры `src/` проекта mobile-docs (Expo SDK 56). Ядро: `src/core/`. Новое: настройки, превью PDF, библиотека документов, адаптив планшетов, иконки шаблонов, guards и стилизованные алерты.*
