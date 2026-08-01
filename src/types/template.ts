@@ -1,7 +1,10 @@
 import type { FieldInputKind } from '@/types/field-validation';
 import type { TemplateIcon } from '@/constants/template-icons';
+import type { PdfFieldRect } from '@/types/document';
 
 export type { TemplateIcon, TemplateIconKind, TemplateSymbolId } from '@/constants/template-icons';
+
+export type TemplateKind = 'html' | 'pdf-backed';
 
 export type TemplateField = {
   key: string;
@@ -10,6 +13,7 @@ export type TemplateField = {
   multiline?: boolean;
   required?: boolean;
   kind?: FieldInputKind;
+  rect?: PdfFieldRect;
 };
 
 import type { PdfStyleDesign } from '@/types/pdf-style-design';
@@ -43,6 +47,8 @@ export type DocumentTemplate = {
   gradientEnd: string;
   fields: TemplateField[];
   pdfStyle?: PdfStyle;
+  kind?: TemplateKind;
+  sourcePdfUri?: string;
   isBuiltIn?: boolean;
   createdAt: string;
   updatedAt: string;

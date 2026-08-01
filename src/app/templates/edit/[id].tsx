@@ -27,6 +27,7 @@ import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
+import { useScrollEdgeControls } from '@/hooks/use-scroll-edge-controls';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { setPendingCreateTemplateSwitch } from '@/lib/create-document-draft';
 import { createEmptyField, normalizePdfStyle, normalizeTemplate } from '@/lib/template-helpers';
@@ -59,6 +60,15 @@ export default function EditTemplateScreen() {
   const [saving, setSaving] = useState(false);
   const [nameDialogVisible, setNameDialogVisible] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+
+  const {
+    scrollRef,
+    onScroll,
+    onContentSizeChange,
+    onLayout,
+    overlay: scrollOverlay,
+    fab: scrollFab,
+  } = useScrollEdgeControls({ itemCount: fields.length });
 
   const colorPreset = TEMPLATE_COLOR_PRESETS[colorIndex];
 
@@ -303,7 +313,12 @@ export default function EditTemplateScreen() {
         options={{
           title: `${t('templates.editTitle')} · ${template.title}`,
           headerRight: () => (
-            <EditorOverflowMenu onGoHome={() => router.dismissAll()} />
+            <EditorOverflowMenu
+              onGoHome={() => router.dismissAll()}
+              onSave={() => {
+                void handleSave();
+              }}
+            />
           ),
         }}
       />
@@ -312,14 +327,20 @@ export default function EditTemplateScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
+        <View style={styles.flex}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.content,
             layout.contentStyle,
-            { paddingBottom: insets.bottom + 24 },
+            { paddingBottom: insets.bottom + 24, paddingRight: 48 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onContentSizeChange={onContentSizeChange}
+          onLayout={onLayout}
         >
           <Text style={styles.heading}>{t('templates.editHeading')}</Text>
           <Text style={styles.subheading}>{t('templates.editSubtitle')}</Text>
@@ -409,6 +430,9 @@ export default function EditTemplateScreen() {
             />
           </View>
         </ScrollView>
+        {scrollOverlay}
+        {scrollFab}
+        </View>
       </KeyboardAvoidingView>
 
       <Modal
@@ -456,6 +480,7 @@ export default function EditTemplateScreen() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.background },
+    flex: { flex: 1 },
     content: { padding: 24, gap: 16 },
     heading: { fontSize: 28, fontWeight: '800', color: colors.text },
     subheading: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },

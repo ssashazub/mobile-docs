@@ -8,8 +8,9 @@ import {
   type PDFField,
 } from 'pdf-lib';
 
-import type { PdfFormField, PdfFormFieldType } from '@/types/document';
+import type { PdfFieldRect, PdfFormField, PdfFormFieldType } from '@/types/document';
 import { inferPdfFormFieldInputKind } from '@/lib/field-validation';
+import { embedUnicodeFont } from '@/lib/pdf-unicode-font';
 
 /** Keep filled values readable next to printed field labels. */
 const FORM_FONT_MIN = 7;
@@ -66,6 +67,43 @@ function readFieldValue(field: PDFField): Pick<PdfFormField, 'value' | 'options'
   return { value: '' };
 }
 
+function readFieldRect(field: PDFField, pdfDoc: PDFDocument): PdfFieldRect | undefined {
+  try {
+    const widgets = field.acroField.getWidgets();
+    if (widgets.length === 0) {
+      return undefined;
+    }
+
+    const widget = widgets[0]!;
+    const { x, y, width, height } = widget.getRectangle();
+    const pages = pdfDoc.getPages();
+    let pageIndex = 0;
+
+    try {
+      // Prefer explicit page reference on the widget annotation when present.
+      const pageRef = (widget as { P?: () => unknown }).P?.();
+      if (pageRef) {
+        const found = pages.findIndex((page) => page.ref === pageRef);
+        if (found >= 0) {
+          pageIndex = found;
+        }
+      }
+    } catch {
+      pageIndex = 0;
+    }
+
+    return {
+      pageIndex,
+      x,
+      y,
+      width: Math.abs(width),
+      height: Math.abs(height),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export function extractFormFields(pdfDoc: PDFDocument): PdfFormField[] {
   const form = pdfDoc.getForm();
 
@@ -91,6 +129,8 @@ export function extractFormFields(pdfDoc: PDFDocument): PdfFormField[] {
       type,
       value,
       options,
+      rect: readFieldRect(field, pdfDoc),
+      origin: 'acroform' as const,
       inputKind:
         type === 'text' || type === 'other'
           ? inferPdfFormFieldInputKind(name, label)
@@ -174,6 +214,8 @@ export async function applyFormFieldValues(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const form = pdfDoc.getForm();
+  // Helvetica (WinAnsi) cannot encode Cyrillic — use a Unicode font for appearances.
+  const unicodeFont = await embedUnicodeFont(pdfDoc);
 
   for (const [name, value] of Object.entries(values)) {
     try {
@@ -205,7 +247,8 @@ export async function applyFormFieldValues(
     }
   }
 
-  return pdfDoc.save();
+  form.updateFieldAppearances(unicodeFont);
+  return pdfDoc.save({ updateFieldAppearances: false });
 }
 
 export function formatFormFieldDisplayValue(field: PdfFormField, value: string): string {

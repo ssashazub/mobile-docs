@@ -18,12 +18,23 @@ type LegacyDocument = {
   source?: DocumentSource;
   originalPdfUri?: string;
   formFields?: PdfFormField[];
+  overlays?: Document['overlays'];
+  hasNativeAcroForm?: boolean;
   importedFileName?: string;
   createdAt: string;
 };
 
 export function normalizeDocument(raw: LegacyDocument): Document {
   const templateId = raw.templateId ?? raw.type ?? 'report';
+  const formFields = raw.formFields?.map((field) => ({
+    ...field,
+    value:
+      field.type === 'checkbox'
+        ? isCheckboxChecked(field.value)
+          ? 'true'
+          : 'false'
+        : field.value,
+  }));
 
   return {
     id: raw.id,
@@ -38,15 +49,11 @@ export function normalizeDocument(raw: LegacyDocument): Document {
     pdfStyle: raw.pdfStyle ? normalizePdfStyle(raw.pdfStyle, templateId) : undefined,
     source: raw.source ?? 'template',
     originalPdfUri: raw.originalPdfUri,
-    formFields: raw.formFields?.map((field) => ({
-      ...field,
-      value:
-        field.type === 'checkbox'
-          ? isCheckboxChecked(field.value)
-            ? 'true'
-            : 'false'
-          : field.value,
-    })),
+    formFields,
+    overlays: raw.overlays ?? [],
+    hasNativeAcroForm:
+      raw.hasNativeAcroForm ??
+      (raw.source === 'imported-form' && (formFields?.length ?? 0) > 0),
     importedFileName: raw.importedFileName,
     createdAt: raw.createdAt,
   };
@@ -91,24 +98,62 @@ export function buildImportedFormDocument(
   fileName: string,
   formFields: PdfFormField[],
   fields: Record<string, string>,
-  originalPdfUri: string
+  originalPdfUri: string,
+  options?: {
+    hasNativeAcroForm?: boolean;
+    templateId?: string;
+    overlays?: Document['overlays'];
+  }
 ): Document {
   const firstValue = formFields.map((field) => fields[field.name]?.trim()).find(Boolean);
   const title = firstValue || fileName.replace(/\.pdf$/i, '') || fileName;
+  const hasNativeAcroForm = options?.hasNativeAcroForm ?? formFields.length > 0;
 
   return {
     id,
     title,
-    templateId: IMPORTED_FORM_TEMPLATE_ID,
+    templateId: options?.templateId ?? IMPORTED_FORM_TEMPLATE_ID,
     client: fields.client?.trim() ?? '',
     description: fileName,
     fields,
     formFields,
+    overlays: options?.overlays ?? [],
+    hasNativeAcroForm,
     source: 'imported-form',
     originalPdfUri,
     importedFileName: fileName,
     createdAt: new Date().toISOString(),
   };
+}
+
+export function buildDocumentFromPdfBackedTemplate(
+  template: DocumentTemplate,
+  fields: Record<string, string>,
+  id: number,
+  originalPdfUri: string,
+  fileName?: string
+): Document {
+  const formFields: PdfFormField[] = template.fields.map((field) => ({
+    name: field.key,
+    label: field.label,
+    type: 'text',
+    value: fields[field.key] ?? '',
+    inputKind: field.kind,
+    rect: field.rect,
+    origin: 'custom',
+  }));
+
+  return buildImportedFormDocument(
+    id,
+    fileName ?? `${template.title}.pdf`,
+    formFields,
+    fields,
+    originalPdfUri,
+    {
+      hasNativeAcroForm: false,
+      templateId: template.id,
+    }
+  );
 }
 
 export async function getDocumentTemplateLabel(templateId: string): Promise<string> {

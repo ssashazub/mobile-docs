@@ -10,7 +10,12 @@ import { ThemedView } from '@/components/themed-view';
 import { LoadingState } from '@/components/ui/loading-state';
 import { showAppAlert } from '@/components/ui/app-alert';
 import { AppDesign } from '@/constants/app-design';
-import { getDocumentDisplayInfo, isImportedFormDocument } from '@/lib/document-display';
+import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
+import {
+  getDocumentDisplayInfo,
+  isExternalPdfImport,
+  isImportedFormDocument,
+} from '@/lib/document-display';
 import { formatFormFieldDisplayValue } from '@/lib/pdf-form';
 import { getDocuments } from '@/lib/document-storage';
 import { exportDocumentPdf } from '@/lib/export-pdf';
@@ -19,6 +24,7 @@ import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
+import { useScrollEdgeControls } from '@/hooks/use-scroll-edge-controls';
 import type { Document } from '@/types/document';
 import type { DocumentTemplate } from '@/types/template';
 
@@ -82,6 +88,28 @@ export default function DocumentDetailsScreen() {
   const [notFound, setNotFound] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  const fieldCount = useMemo(() => {
+    if (!document) {
+      return 0;
+    }
+    if (isExternalPdfImport(document) && document.formFields?.length) {
+      return document.formFields.length;
+    }
+    if (isExternalPdfImport(document)) {
+      return (document.overlays ?? []).filter((overlay) => overlay.text.trim()).length;
+    }
+    return Object.keys(document.fields).length;
+  }, [document]);
+
+  const {
+    scrollRef,
+    onScroll,
+    onContentSizeChange,
+    onLayout,
+    overlay: scrollOverlay,
+    fab: scrollFab,
+  } = useScrollEdgeControls({ itemCount: fieldCount });
+
   const loadDocument = useCallback(async () => {
     if (documentId === null) {
       setNotFound(true);
@@ -110,7 +138,15 @@ export default function DocumentDetailsScreen() {
 
       if (isImportedFormDocument(foundDocument)) {
         setDocument(foundDocument);
-        setTemplate(null);
+        if (
+          foundDocument.templateId &&
+          foundDocument.templateId !== IMPORTED_FORM_TEMPLATE_ID
+        ) {
+          const loadedTemplate = await getTemplateById(foundDocument.templateId);
+          setTemplate(loadedTemplate ?? null);
+        } else {
+          setTemplate(null);
+        }
         return;
       }
 
@@ -133,8 +169,9 @@ export default function DocumentDetailsScreen() {
       return;
     }
 
-    // Imported PDFs: skip in-app preview for now (WebView can't show the file reliably).
-    if (isImportedFormDocument(document)) {
+    // Plain external PDFs: share the file directly (no HTML preview).
+    // App-template docs keep the usual preview → save / more flow.
+    if (isExternalPdfImport(document)) {
       setExporting(true);
       try {
         await exportDocumentPdf(document);
@@ -170,6 +207,9 @@ export default function DocumentDetailsScreen() {
   }
 
   const display = getDocumentDisplayInfo(document, template);
+  const openEditor = () => {
+    router.push(`/document/edit/${document.id}` as Href);
+  };
 
   return (
     <>
@@ -178,7 +218,7 @@ export default function DocumentDetailsScreen() {
           title: document.title,
           headerRight: () => (
             <Pressable
-              onPress={() => router.push(`/document/edit/${document.id}`)}
+              onPress={openEditor}
               style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
             >
               <ThemedText style={{ color: colors.text, fontWeight: '700' }}>{t('common.edit')}</ThemedText>
@@ -188,14 +228,20 @@ export default function DocumentDetailsScreen() {
       />
 
       <ThemedView style={styles.screen}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            layout.contentStyle,
-            { paddingBottom: insets.bottom + Spacing.four },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.flex}>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={[
+              styles.content,
+              layout.contentStyle,
+              { paddingBottom: insets.bottom + Spacing.four, paddingRight: 48 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={onContentSizeChange}
+            onLayout={onLayout}
+          >
           <LinearGradient
             colors={[display.accentColor, display.gradientEnd]}
             start={{ x: 0, y: 0 }}
@@ -216,7 +262,7 @@ export default function DocumentDetailsScreen() {
           </LinearGradient>
 
           <View style={styles.details}>
-            {isImportedFormDocument(document) && document.formFields
+            {isExternalPdfImport(document) && document.formFields && document.formFields.length > 0
               ? document.formFields.map((field) => (
                   <DetailRow
                     key={field.name}
@@ -224,6 +270,16 @@ export default function DocumentDetailsScreen() {
                     value={formatFormFieldDisplayValue(field, document.fields[field.name] ?? '')}
                   />
                 ))
+              : isExternalPdfImport(document)
+                ? (document.overlays ?? [])
+                    .filter((overlay) => overlay.text.trim())
+                    .map((overlay) => (
+                      <DetailRow
+                        key={overlay.id}
+                        label={t('import.overlayPlaceholder')}
+                        value={overlay.text}
+                      />
+                    ))
               : display.fields.map((field) => (
                   <DetailRow
                     key={field.key}
@@ -246,7 +302,10 @@ export default function DocumentDetailsScreen() {
               {exporting ? t('document.exportingPdf') : t('document.exportPdf')}
             </ThemedText>
           </Pressable>
-        </ScrollView>
+          </ScrollView>
+          {scrollOverlay}
+          {scrollFab}
+        </View>
       </ThemedView>
     </>
   );
@@ -255,6 +314,9 @@ export default function DocumentDetailsScreen() {
 function createStyles(_colors: ThemeColors) {
   return StyleSheet.create({
     screen: {
+      flex: 1,
+    },
+    flex: {
       flex: 1,
     },
     content: {

@@ -27,6 +27,7 @@ import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
+import { useScrollEdgeControls } from '@/hooks/use-scroll-edge-controls';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import {
   cloneTemplateFields,
@@ -59,6 +60,15 @@ export default function CreateTemplateScreen() {
   const [fields, setFields] = useState<TemplateField[]>(blank.fields);
   const [pdfStyle, setPdfStyle] = useState<PdfStyle>({ ...DEFAULT_PDF_STYLE });
   const [saving, setSaving] = useState(false);
+
+  const {
+    scrollRef,
+    onScroll,
+    onContentSizeChange,
+    onLayout,
+    overlay: scrollOverlay,
+    fab: scrollFab,
+  } = useScrollEdgeControls({ itemCount: fields.length + templates.length });
 
   const colorPreset = TEMPLATE_COLOR_PRESETS[colorIndex];
 
@@ -175,7 +185,12 @@ export default function CreateTemplateScreen() {
         options={{
           title: t('templates.newTemplate'),
           headerRight: () => (
-            <EditorOverflowMenu onGoHome={() => router.dismissAll()} />
+            <EditorOverflowMenu
+              onGoHome={() => router.dismissAll()}
+              onSave={() => {
+                void handleSave();
+              }}
+            />
           ),
         }}
       />
@@ -184,14 +199,20 @@ export default function CreateTemplateScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
+        <View style={styles.flex}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[
             styles.content,
             layout.contentStyle,
-            { paddingBottom: insets.bottom + 24 },
+            { paddingBottom: insets.bottom + 24, paddingRight: 48 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onContentSizeChange={onContentSizeChange}
+          onLayout={onLayout}
         >
           <Text style={styles.heading}>{t('templates.createHeading')}</Text>
           <Text style={styles.subheading}>{t('templates.createFormSubtitle')}</Text>
@@ -332,6 +353,9 @@ export default function CreateTemplateScreen() {
             />
           </View>
         </ScrollView>
+        {scrollOverlay}
+        {scrollFab}
+        </View>
       </KeyboardAvoidingView>
     </>
   );
@@ -340,6 +364,7 @@ export default function CreateTemplateScreen() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.background },
+    flex: { flex: 1 },
     content: { padding: 24, gap: 16 },
     heading: { fontSize: 28, fontWeight: '800', color: colors.text },
     subheading: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },

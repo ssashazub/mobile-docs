@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { ValidatedFormField } from '@/components/validated-form-field';
@@ -73,7 +73,7 @@ function OptionPicker({
   );
 }
 
-export function PdfFormFieldInput({
+export const PdfFormFieldInput = memo(function PdfFormFieldInput({
   field,
   value,
   onChange,
@@ -138,12 +138,10 @@ export function PdfFormFieldInput({
       onChangeText={onChange}
       error={error}
       shakeToken={shakeToken}
-      multiline={field.type === 'text' && value.length > 80}
-      numberOfLines={field.type === 'text' && value.length > 80 ? 4 : 1}
-      textAlignVertical={field.type === 'text' && value.length > 80 ? 'top' : 'center'}
+      multiline
     />
   );
-}
+});
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({

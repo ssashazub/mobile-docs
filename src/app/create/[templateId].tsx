@@ -25,6 +25,7 @@ import { useFieldFocusOnError } from '@/hooks/use-field-focus-on-error';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
+import { useScrollEdgeControls } from '@/hooks/use-scroll-edge-controls';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import * as Haptics from '@/lib/haptics';
 import {
@@ -33,9 +34,14 @@ import {
   takeCreateDocumentDraft,
 } from '@/lib/create-document-draft';
 import { addDocument, getDocuments } from '@/lib/document-storage';
-import { buildDocumentFromFields, getNextDocumentId } from '@/lib/document-helpers';
+import {
+  buildDocumentFromFields,
+  buildDocumentFromPdfBackedTemplate,
+  getNextDocumentId,
+} from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
 import { validateTemplateFields } from '@/lib/field-validation';
+import { copyPdfToDocument } from '@/lib/pdf-file-storage';
 import { normalizePdfStyle } from '@/lib/template-helpers';
 import { normalizeTemplateIcon } from '@/lib/template-icon';
 import { getTemplateById } from '@/lib/template-storage';
@@ -67,6 +73,18 @@ export default function CreateDocumentFormScreen() {
     clearFieldError,
     focusInvalidField,
   } = useFieldFocusOnError();
+
+  const fieldList = useMemo(() => template?.fields ?? [], [template]);
+  const {
+    onScroll,
+    onContentSizeChange,
+    onLayout,
+    overlay: scrollOverlay,
+    fab: scrollFab,
+  } = useScrollEdgeControls({
+    scrollRef,
+    itemCount: fieldList.length,
+  });
 
   fieldsRef.current = fields;
   pdfStyleRef.current = pdfStyle;
@@ -164,14 +182,30 @@ export default function CreateDocumentFormScreen() {
 
     try {
       const documents = await getDocuments();
-      const newDocument = buildDocumentFromFields(
-        template,
-        Object.fromEntries(
-          Object.entries(fields).map(([key, value]) => [key, value.trim()])
-        ),
-        getNextDocumentId(documents),
-        pdfStyle
+      const nextId = getNextDocumentId(documents);
+      const trimmedFields = Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [key, value.trim()])
       );
+
+      if (template.kind === 'pdf-backed' && template.sourcePdfUri) {
+        const originalPdfUri = await copyPdfToDocument(template.sourcePdfUri, nextId);
+        const newDocument = buildDocumentFromPdfBackedTemplate(
+          template,
+          trimmedFields,
+          nextId,
+          originalPdfUri
+        );
+        await addDocument(newDocument);
+        if (destination === 'detail') {
+          allowNavigationRef.current();
+          router.replace(`/document/${newDocument.id}`);
+        } else if (destination !== 'none') {
+          navigateAfterExit(destination);
+        }
+        return true;
+      }
+
+      const newDocument = buildDocumentFromFields(template, trimmedFields, nextId, pdfStyle);
 
       await addDocument(newDocument);
       if (destination === 'detail') {
@@ -224,8 +258,6 @@ export default function CreateDocumentFormScreen() {
     router.push(`/templates/edit/${templateId}?fromCreate=1` as Href);
   };
 
-  const fieldList = useMemo(() => template?.fields ?? [], [template]);
-
   if (loading) {
     return (
       <ThemedView style={styles.centered}>
@@ -253,6 +285,9 @@ export default function CreateDocumentFormScreen() {
               onGoHome={() => navigateAfterExit('home')}
               onOpenLibrary={() => navigateAfterExit('library')}
               onEditTemplate={openTemplateEditor}
+              onSave={() => {
+                void handleCreate();
+              }}
             />
           ),
         }}
@@ -263,15 +298,20 @@ export default function CreateDocumentFormScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
+        <View style={styles.flex}>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[
             styles.content,
             layout.contentStyle,
-            { paddingBottom: insets.bottom + 24 },
+            { paddingBottom: insets.bottom + 24, paddingRight: 48 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onContentSizeChange={onContentSizeChange}
+          onLayout={onLayout}
         >
           <LinearGradient
             colors={[template.accentColor, template.gradientEnd]}
@@ -293,12 +333,14 @@ export default function CreateDocumentFormScreen() {
             <Text style={styles.noteText}>{t('create.inputLanguageText')}</Text>
           </View>
 
-          <PdfLayoutPicker
-            value={pdfStyle}
-            accentColor={template.accentColor}
-            gradientEnd={template.gradientEnd}
-            onChange={setPdfStyle}
-          />
+          {template.kind === 'pdf-backed' ? null : (
+            <PdfLayoutPicker
+              value={pdfStyle}
+              accentColor={template.accentColor}
+              gradientEnd={template.gradientEnd}
+              onChange={setPdfStyle}
+            />
+          )}
 
           <View
             style={styles.form}
@@ -319,9 +361,8 @@ export default function CreateDocumentFormScreen() {
                   shakeToken={errorFieldKey === field.key ? shakeToken : 0}
                   onChangeText={(value) => updateField(field.key, value)}
                   placeholder={field.placeholder}
-                  multiline={field.multiline}
-                  numberOfLines={field.multiline ? 4 : 1}
-                  textAlignVertical={field.multiline ? 'top' : 'center'}
+                  multiline
+                  textAlignVertical={field.multiline ? 'top' : undefined}
                   style={field.multiline ? styles.multiline : undefined}
                 />
               </View>
@@ -342,6 +383,9 @@ export default function CreateDocumentFormScreen() {
             />
           </View>
         </ScrollView>
+        {scrollOverlay}
+        {scrollFab}
+        </View>
         </KeyboardAvoidingView>
       </ThemedView>
     </>

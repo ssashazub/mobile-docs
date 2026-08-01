@@ -148,7 +148,7 @@ export default function HomeScreen() {
       setImporting(true);
       const document = await pickAndImportPdf();
       await loadData();
-      router.push(`/document/edit/${document.id}`);
+      router.push(`/document/import-choice/${document.id}`);
     } catch (error) {
       if (error instanceof ImportCancelledError) {
         return;

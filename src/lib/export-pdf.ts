@@ -5,10 +5,11 @@ import * as Print from 'expo-print';
 import { t } from '@/i18n';
 import { PDF_A4 } from '@/constants/pdf-page';
 import { getAppSettings } from '@/lib/app-settings-storage';
-import { isImportedFormDocument } from '@/lib/document-display';
+import { isAppTemplateDocument, isImportedFormDocument } from '@/lib/document-display';
 import { buildExportFileBaseName } from '@/lib/export-file-name';
 import { writeExportPdfBytes } from '@/lib/export-folder';
 import { applyFormFieldValues } from '@/lib/pdf-form';
+import { drawDocumentOverlays } from '@/lib/pdf-draw-overlays';
 import { buildExportMetadata, embedMetadataInPdfBytes } from '@/lib/pdf-metadata';
 import { base64ToUint8Array, readPdfBytes, uint8ArrayToBase64 } from '@/lib/pdf-bytes';
 import { renderDocumentPdfHtml } from '@/lib/pdf-templates';
@@ -140,13 +141,26 @@ async function buildTemplatePdf(document: Document): Promise<{
   return { pdfBytes, previewHtml };
 }
 
+/** Render a template-based document to PDF bytes (with Mobile Docs metadata). */
+export async function renderTemplateDocumentPdfBytes(document: Document): Promise<Uint8Array> {
+  const built = await buildTemplatePdf(document);
+  return built.pdfBytes;
+}
+
 async function buildImportedFormPdf(document: Document): Promise<Uint8Array> {
   if (!document.originalPdfUri) {
     throw new Error(t('import.missingOriginalPdf'));
   }
 
   const sourceBytes = await readPdfBytes(document.originalPdfUri);
-  return applyFormFieldValues(sourceBytes, document.fields);
+  let pdfBytes = sourceBytes;
+
+  if (document.hasNativeAcroForm) {
+    pdfBytes = await applyFormFieldValues(pdfBytes, document.fields);
+  }
+
+  pdfBytes = await drawDocumentOverlays(pdfBytes, document);
+  return pdfBytes;
 }
 
 /** Prepare PDF for preview / print / share without opening the share sheet yet. */
@@ -157,7 +171,7 @@ export async function prepareDocumentPdf(document: Document): Promise<PreparedPd
   let pdfBytes: Uint8Array;
   let previewHtml: string | undefined;
 
-  if (isImportedFormDocument(document)) {
+  if (isImportedFormDocument(document) && !isAppTemplateDocument(document)) {
     pdfBytes = await buildImportedFormPdf(document);
   } else {
     const built = await buildTemplatePdf(document);

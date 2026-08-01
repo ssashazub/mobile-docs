@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -132,6 +132,7 @@ export default function SettingsScreen() {
     useState<Record<StorageTarget, boolean>>(EMPTY_STORAGE_SELECTION);
   const storageProgress = useSharedValue(0);
   const storageHeight = useSharedValue(0);
+  const measuredStorageHeight = useRef(0);
   const appVersion = getAppVersion();
   const selectedTargets = STORAGE_TARGETS.filter((option) => storageSelection[option.value]);
   const storageChevronStyle = useAnimatedStyle(() => ({
@@ -151,15 +152,15 @@ export default function SettingsScreen() {
 
   const toggleStorageOpen = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStorageOpen((current) => {
-      const next = !current;
-      storageProgress.value = withTiming(next ? 1 : 0, {
-        duration: next ? 360 : 280,
-        easing: next ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
-      });
-      return next;
-    });
+    setStorageOpen((current) => !current);
   };
+
+  useEffect(() => {
+    storageProgress.value = withTiming(storageOpen ? 1 : 0, {
+      duration: storageOpen ? 360 : 280,
+      easing: storageOpen ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+    });
+  }, [storageOpen, storageProgress]);
 
   const selectedLanguage = LANGUAGE_OPTIONS.find((option) => option.value === preference)!;
   const selectedLanguageLabel = t(selectedLanguage.labelKey);
@@ -452,7 +453,8 @@ export default function SettingsScreen() {
               style={styles.storagePanelMeasure}
               onLayout={(event) => {
                 const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-                if (nextHeight > 0 && Math.abs(storageHeight.value - nextHeight) > 1) {
+                if (nextHeight > 0 && Math.abs(measuredStorageHeight.current - nextHeight) > 1) {
+                  measuredStorageHeight.current = nextHeight;
                   storageHeight.value = nextHeight;
                 }
               }}

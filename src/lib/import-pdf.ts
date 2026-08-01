@@ -5,7 +5,7 @@ import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
 import { t } from '@/i18n';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import {
-  buildDocumentFromFields,
+  buildDocumentFromPdfBackedTemplate,
   buildImportedFormDocument,
   getNextDocumentId,
 } from '@/lib/document-helpers';
@@ -54,35 +54,47 @@ export async function pickAndImportPdf(): Promise<Document> {
       throw new Error(t('import.templateMissing'));
     }
 
-    const document = buildDocumentFromFields(
+    // Keep the exported PDF so both field-list and on-document fill work.
+    const storedUri = await savePdfBytesForDocument(nextId, pdfBytes);
+    const document = buildDocumentFromPdfBackedTemplate(
       template,
       metadata.fields,
       nextId,
-      metadata.pdfStyle
+      storedUri,
+      metadata.title?.trim() || fileName
     );
 
+    if (metadata.pdfStyle) {
+      document.pdfStyle = metadata.pdfStyle;
+    }
     if (metadata.title?.trim()) {
       document.title = metadata.title.trim();
     }
 
-    document.source = 'template';
     await addDocument(document);
     return document;
   }
 
   const formFields = extractFormFields(pdfDoc);
-  if (formFields.length === 0) {
-    throw new Error(t('import.noFormFields'));
-  }
-
   const storedUri = await savePdfBytesForDocument(nextId, pdfBytes);
   const fields = Object.fromEntries(formFields.map((field) => [field.name, field.value]));
-  const document = buildImportedFormDocument(nextId, fileName, formFields, fields, storedUri);
+  const document = buildImportedFormDocument(
+    nextId,
+    fileName,
+    formFields,
+    fields,
+    storedUri,
+    { hasNativeAcroForm: formFields.length > 0 }
+  );
 
   await addDocument(document);
   return document;
 }
 
 export function isRestoredAppPdf(document: Document): boolean {
-  return document.source === 'template' && document.templateId !== IMPORTED_FORM_TEMPLATE_ID;
+  return (
+    document.source === 'imported-form' &&
+    Boolean(document.templateId) &&
+    document.templateId !== IMPORTED_FORM_TEMPLATE_ID
+  );
 }

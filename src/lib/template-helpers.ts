@@ -29,6 +29,7 @@ export function normalizeTemplate(template: DocumentTemplate): DocumentTemplate 
     ...template,
     icon,
     emoji: resolveIconPdfText(icon),
+    kind: template.kind ?? 'html',
     pdfStyle: normalizePdfStyle(template.pdfStyle, template.id),
     fields: template.fields.map((field) => ({ ...field })),
   };

@@ -1,15 +1,22 @@
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   View,
+  type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import {
+  ScrollEdgeFab,
+  type ScrollEdgeFabHandle,
+} from '@/components/ui/scroll-edge-fab';
 import { TemplateIconBadge } from '@/components/template-icon-view';
 import { PdfFormFieldInput } from '@/components/pdf-form-field';
 import { ValidatedFormField } from '@/components/validated-form-field';
@@ -21,7 +28,12 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
-import { getDocumentDisplayInfo, isImportedFormDocument } from '@/lib/document-display';
+import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
+import { getDocumentDisplayInfo, isExternalPdfImport, isImportedFormDocument } from '@/lib/document-display';
+import {
+  canFillOnDocument,
+  ensurePdfBackedForOnDocumentFill,
+} from '@/lib/document-fill-mode';
 import { getDocuments, updateDocument } from '@/lib/document-storage';
 import { buildDocumentFromFields } from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
@@ -35,8 +47,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { useLayout } from '@/hooks/use-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import * as Haptics from '@/lib/haptics';
-import type { Document } from '@/types/document';
-import type { DocumentTemplate, PdfStyle } from '@/types/template';
+import type { Document, PdfFormField } from '@/types/document';
+import type { DocumentTemplate, PdfStyle, TemplateField } from '@/types/template';
 
 function parseDocumentId(id: string | string[] | undefined): number | null {
   const rawId = Array.isArray(id) ? id[0] : id;
@@ -49,13 +61,52 @@ function parseDocumentId(id: string | string[] | undefined): number | null {
   return parsedId;
 }
 
+type EditorRow =
+  | { key: string; kind: 'pdf'; field: PdfFormField }
+  | { key: string; kind: 'template'; field: TemplateField }
+  | { key: string; kind: 'empty-import' };
+
+function ListSeparator() {
+  return <View style={{ height: Spacing.three }} />;
+}
+
+const PdfEditorRow = memo(function PdfEditorRow({
+  field,
+  value,
+  error,
+  shakeToken,
+  onChangeField,
+}: {
+  field: PdfFormField;
+  value: string;
+  error: boolean;
+  shakeToken: number;
+  onChangeField: (name: string, value: string) => void;
+}) {
+  const onChange = useCallback(
+    (next: string) => onChangeField(field.name, next),
+    [field.name, onChangeField]
+  );
+
+  return (
+    <PdfFormFieldInput
+      field={field}
+      value={value}
+      onChange={onChange}
+      error={error}
+      shakeToken={shakeToken}
+    />
+  );
+});
+
 export default function EditDocumentScreen() {
   const { t } = useI18n();
   const colors = useTheme();
   const layout = useLayout();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, view } = useLocalSearchParams<{ id: string; view?: string }>();
   const documentId = parseDocumentId(id);
+  const designView = view === 'design';
   const insets = useSafeAreaInsets();
 
   const [document, setDocument] = useState<Document | null>(null);
@@ -65,15 +116,161 @@ export default function EditDocumentScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [jumpingToEnd, setJumpingToEnd] = useState(false);
+  const [menuHintPulseKey, setMenuHintPulseKey] = useState(0);
+  const scrollFabRef = useRef<ScrollEdgeFabHandle>(null);
+  const offsetYRef = useRef(0);
+  const viewportHeightRef = useRef(0);
+  const contentHeightRef = useRef(0);
+  const jumpGenerationRef = useRef(0);
+  const rowsLengthRef = useRef(0);
   const {
-    scrollRef,
+    listRef,
     errorFieldKey,
     shakeToken,
-    setFormLayoutY,
-    setFieldLayoutY,
+    setFieldIndexes,
     clearFieldError,
     focusInvalidField,
   } = useFieldFocusOnError();
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    offsetYRef.current = contentOffset.y;
+    viewportHeightRef.current = layoutMeasurement.height;
+    contentHeightRef.current = contentSize.height;
+    scrollFabRef.current?.setMetrics(
+      contentOffset.y,
+      layoutMeasurement.height,
+      contentSize.height
+    );
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    jumpGenerationRef.current += 1;
+    setJumpingToEnd(false);
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [listRef]);
+
+  const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const isNearBottom = useCallback(() => {
+    const content = contentHeightRef.current;
+    const viewport = viewportHeightRef.current;
+    const offset = offsetYRef.current;
+    if (content <= 0 || viewport <= 0) {
+      return false;
+    }
+    return content - (offset + viewport) <= 28;
+  }, []);
+
+  const jumpToLastItem = useCallback(
+    (animated: boolean) => {
+      const lastIndex = Math.max(0, rowsLengthRef.current - 1);
+      try {
+        listRef.current?.scrollToIndex({
+          index: lastIndex,
+          animated,
+          viewPosition: 1,
+        });
+      } catch {
+        listRef.current?.scrollToEnd({ animated });
+      }
+    },
+    [listRef]
+  );
+
+  const scrollToBottom = useCallback(async () => {
+    if (jumpingToEnd) {
+      return;
+    }
+
+    const totalRows = rowsLengthRef.current;
+    const isLargeDocument = totalRows >= 80;
+    const generation = ++jumpGenerationRef.current;
+
+    // Short lists are already mounted — normal smooth scroll is enough.
+    if (!isLargeDocument) {
+      jumpToLastItem(true);
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToEnd({ animated: true });
+      });
+      return;
+    }
+
+    setJumpingToEnd(true);
+    const startedAt = Date.now();
+
+    try {
+      let previousContentHeight = -1;
+      let stablePasses = 0;
+
+      for (let attempt = 0; attempt < 60; attempt++) {
+        if (jumpGenerationRef.current !== generation) {
+          return;
+        }
+
+        jumpToLastItem(false);
+        await wait(40);
+        if (jumpGenerationRef.current !== generation) {
+          return;
+        }
+
+        listRef.current?.scrollToEnd({ animated: false });
+        await wait(24);
+
+        const contentHeight = contentHeightRef.current;
+        if (Math.abs(contentHeight - previousContentHeight) < 2) {
+          stablePasses += 1;
+        } else {
+          stablePasses = 0;
+        }
+        previousContentHeight = contentHeight;
+
+        if (isNearBottom() && stablePasses >= 2) {
+          break;
+        }
+
+        listRef.current?.scrollToOffset({
+          offset: Math.max(
+            contentHeightRef.current,
+            (attempt + 1) * Math.max(viewportHeightRef.current, 500)
+          ),
+          animated: false,
+        });
+      }
+
+      if (jumpGenerationRef.current !== generation) {
+        return;
+      }
+
+      // Land at the bottom before the loader disappears — no visible scroll.
+      listRef.current?.scrollToEnd({ animated: false });
+      scrollFabRef.current?.setMetrics(
+        offsetYRef.current,
+        viewportHeightRef.current,
+        contentHeightRef.current
+      );
+
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 550) {
+        await wait(550 - elapsed);
+      }
+    } finally {
+      if (jumpGenerationRef.current === generation) {
+        // Final snap in case layout settled during the min loader time.
+        listRef.current?.scrollToEnd({ animated: false });
+        setJumpingToEnd(false);
+        requestAnimationFrame(() => {
+          listRef.current?.scrollToEnd({ animated: false });
+          scrollFabRef.current?.setMetrics(
+            offsetYRef.current,
+            viewportHeightRef.current,
+            contentHeightRef.current
+          );
+        });
+      }
+    }
+  }, [isNearBottom, jumpToLastItem, jumpingToEnd, listRef]);
 
   useFocusEffect(
     useCallback(() => {
@@ -105,8 +302,24 @@ export default function EditDocumentScreen() {
           if (isImportedFormDocument(foundDocument)) {
             if (isActive) {
               setDocument(foundDocument);
-              setTemplate(null);
               setFields(foundDocument.fields);
+              if (
+                foundDocument.templateId &&
+                foundDocument.templateId !== IMPORTED_FORM_TEMPLATE_ID
+              ) {
+                const loadedTemplate = await getTemplateById(foundDocument.templateId);
+                setTemplate(loadedTemplate ?? null);
+                if (loadedTemplate) {
+                  setPdfStyle(
+                    normalizePdfStyle(
+                      foundDocument.pdfStyle ?? loadedTemplate.pdfStyle,
+                      loadedTemplate.id
+                    )
+                  );
+                }
+              } else {
+                setTemplate(null);
+              }
             }
             return;
           }
@@ -146,10 +359,22 @@ export default function EditDocumentScreen() {
     }, [documentId])
   );
 
-  const updateField = (key: string, value: string) => {
-    clearFieldError(key);
-    setFields((current) => ({ ...current, [key]: value }));
-  };
+  const display = document ? getDocumentDisplayInfo(document, template) : null;
+  const isFormImport = document ? isImportedFormDocument(document) : false;
+  const formFieldCount = document?.formFields?.length ?? 0;
+  /** Full document editor: layout picker + template fields (not AcroForm list). */
+  const useDesignEditor = Boolean(template) && (!isFormImport || designView);
+  const showFillOnDocument = Boolean(
+    document && (isFormImport || canFillOnDocument(document))
+  );
+
+  const updateField = useCallback(
+    (key: string, value: string) => {
+      clearFieldError(key);
+      setFields((current) => ({ ...current, [key]: value }));
+    },
+    [clearFieldError]
+  );
 
   const navigateAfterExit = (destination: 'home' | 'library') => {
     if (destination === 'home') {
@@ -167,7 +392,25 @@ export default function EditDocumentScreen() {
       return false;
     }
 
-    if (isImportedFormDocument(document) && document.formFields) {
+    if (useDesignEditor && template) {
+      const validationError = validateTemplateFields(template.fields, fields);
+
+      if (validationError) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        focusInvalidField(validationError);
+
+        if (validationError.messageKey !== 'required') {
+          const alert = getFieldValidationAlert(validationError, t);
+          showAppAlert(alert.title, alert.message);
+        }
+
+        return false;
+      }
+    } else if (
+      isImportedFormDocument(document) &&
+      document.formFields &&
+      !isExternalPdfImport(document)
+    ) {
       const validationError = validatePdfFormFields(document.formFields, fields);
 
       if (validationError) {
@@ -181,7 +424,7 @@ export default function EditDocumentScreen() {
 
         return false;
       }
-    } else if (template) {
+    } else if (!isExternalPdfImport(document) && template) {
       const validationError = validateTemplateFields(template.fields, fields);
 
       if (validationError) {
@@ -200,6 +443,42 @@ export default function EditDocumentScreen() {
     setSaving(true);
 
     try {
+      if (useDesignEditor && template && isImportedFormDocument(document)) {
+        const nextFields = Object.fromEntries(
+          Object.entries(fields).map(([key, value]) => [key, value.trim()])
+        );
+        const firstValue = Object.values(nextFields).find((value) => value.length > 0);
+
+        await updateDocument({
+          ...document,
+          fields: nextFields,
+          pdfStyle,
+          formFields: template.fields.map((field) => {
+            const existing = document.formFields?.find((item) => item.name === field.key);
+            return {
+              name: field.key,
+              label: field.label,
+              type: 'text' as const,
+              value: nextFields[field.key] ?? '',
+              inputKind: field.kind,
+              rect: existing?.rect ?? field.rect,
+              origin: existing?.origin ?? 'custom',
+              sourceText: existing?.sourceText,
+              fontSize: existing?.fontSize,
+              align: existing?.align,
+            };
+          }),
+          title: nextFields.title?.trim() || firstValue || document.title,
+        });
+        if (destination === 'default') {
+          allowNavigation();
+          router.replace(`/document/${documentId}`);
+        } else if (destination !== 'none') {
+          navigateAfterExit(destination);
+        }
+        return true;
+      }
+
       if (isImportedFormDocument(document)) {
         const nextFields = Object.fromEntries(
           Object.entries(fields).map(([key, value]) => [key, value.trim()])
@@ -247,11 +526,14 @@ export default function EditDocumentScreen() {
       return false;
     }
 
-    if (JSON.stringify(fields) !== JSON.stringify(document.fields)) {
+    const fieldsChanged = Object.keys({ ...document.fields, ...fields }).some(
+      (key) => (document.fields[key] ?? '') !== (fields[key] ?? '')
+    );
+    if (fieldsChanged) {
       return true;
     }
 
-    if (isImportedFormDocument(document)) {
+    if (isImportedFormDocument(document) && !useDesignEditor) {
       return false;
     }
 
@@ -260,12 +542,249 @@ export default function EditDocumentScreen() {
       template?.id
     );
     return JSON.stringify(pdfStyle) !== JSON.stringify(initialStyle);
-  }, [document, fields, pdfStyle, template]);
+  }, [document, fields, pdfStyle, template, useDesignEditor]);
 
   const allowNavigation = useUnsavedChangesGuard({
     hasChanges,
     onSave: () => saveDocument('none'),
   });
+
+  // Pulse ⋮ once the editor is ready (not on focus alone — loading unmounts the header).
+  useEffect(() => {
+    if (loading || !showFillOnDocument || documentId === null) {
+      return;
+    }
+    setMenuHintPulseKey((key) => key + 1);
+  }, [documentId, loading, showFillOnDocument]);
+
+  const openFillOnDocument = useCallback(() => {
+    if (!document) {
+      return;
+    }
+    allowNavigation();
+    void (async () => {
+      try {
+        const ready = await ensurePdfBackedForOnDocumentFill(document);
+        router.push(`/document/fill-on-page/${ready.id}` as Href);
+      } catch (error) {
+        showAppAlert(
+          t('import.errorTitle'),
+          error instanceof Error ? error.message : t('import.errorTitle')
+        );
+      }
+    })();
+  }, [allowNavigation, document, t]);
+
+  const openFillOnDocumentRef = useRef(openFillOnDocument);
+  openFillOnDocumentRef.current = openFillOnDocument;
+  const navigateAfterExitRef = useRef(navigateAfterExit);
+  navigateAfterExitRef.current = navigateAfterExit;
+
+  const canOpenDesignEditor = Boolean(
+    isFormImport && template && !designView
+  );
+
+  const openDocumentEditor = useCallback(() => {
+    router.setParams({ view: 'design' });
+  }, []);
+
+  const openDocumentEditorRef = useRef(openDocumentEditor);
+  openDocumentEditorRef.current = openDocumentEditor;
+
+  const handleOverflowFillOnDocument = useCallback(() => {
+    openFillOnDocumentRef.current();
+  }, []);
+
+  const handleOverflowOpenDocumentEditor = useCallback(() => {
+    openDocumentEditorRef.current();
+  }, []);
+
+  const saveDocumentRef = useRef(saveDocument);
+  saveDocumentRef.current = saveDocument;
+
+  const handleOverflowSave = useCallback(() => {
+    void saveDocumentRef.current();
+  }, []);
+
+  const headerRight = useCallback(
+    () => (
+      <EditorOverflowMenu
+        onGoHome={() => navigateAfterExitRef.current('home')}
+        onOpenLibrary={() => navigateAfterExitRef.current('library')}
+        onOpenDocumentEditor={
+          canOpenDesignEditor ? handleOverflowOpenDocumentEditor : undefined
+        }
+        onFillOnDocument={
+          showFillOnDocument ? handleOverflowFillOnDocument : undefined
+        }
+        onSave={handleOverflowSave}
+        hintPulseKey={showFillOnDocument ? menuHintPulseKey : -1}
+      />
+    ),
+    [
+      canOpenDesignEditor,
+      handleOverflowFillOnDocument,
+      handleOverflowOpenDocumentEditor,
+      handleOverflowSave,
+      menuHintPulseKey,
+      showFillOnDocument,
+    ]
+  );
+
+  const rows = useMemo<EditorRow[]>(() => {
+    if (!document || !display) {
+      return [];
+    }
+
+    if (useDesignEditor && template) {
+      return template.fields.map((field) => ({
+        key: field.key,
+        kind: 'template' as const,
+        field,
+      }));
+    }
+
+    if (isFormImport && formFieldCount > 0) {
+      return document.formFields!.map((field) => ({
+        key: field.name,
+        kind: 'pdf' as const,
+        field,
+      }));
+    }
+
+    if (isFormImport) {
+      return [{ key: 'empty-import', kind: 'empty-import' as const }];
+    }
+
+    return display.fields.map((field) => ({
+      key: field.key,
+      kind: 'template' as const,
+      field,
+    }));
+  }, [display, document, formFieldCount, isFormImport, template, useDesignEditor]);
+
+  useEffect(() => {
+    rowsLengthRef.current = rows.length;
+    setFieldIndexes(rows.map((row, index) => ({ key: row.key, index })));
+  }, [rows, setFieldIndexes]);
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<EditorRow>) => {
+      if (item.kind === 'empty-import' && document) {
+        return (
+          <PrimaryButton
+            label={t('import.createTemplate')}
+            variant="secondary"
+            onPress={() => {
+              allowNavigation();
+              router.push(`/document/markup/${document.id}` as Href);
+            }}
+          />
+        );
+      }
+
+      if (item.kind === 'pdf') {
+        return (
+          <PdfEditorRow
+            field={item.field}
+            value={fields[item.field.name] ?? ''}
+            onChangeField={updateField}
+            error={errorFieldKey === item.field.name}
+            shakeToken={errorFieldKey === item.field.name ? shakeToken : 0}
+          />
+        );
+      }
+
+      if (item.kind === 'template') {
+        return (
+          <ValidatedFormField
+            fieldKey={item.field.key}
+            kind={item.field.kind}
+            label={item.field.label}
+            value={fields[item.field.key] ?? ''}
+            required={item.field.required}
+            error={errorFieldKey === item.field.key}
+            shakeToken={errorFieldKey === item.field.key ? shakeToken : 0}
+            onChangeText={(value) => updateField(item.field.key, value)}
+            placeholder={item.field.placeholder}
+            multiline
+            textAlignVertical={item.field.multiline ? 'top' : undefined}
+            style={item.field.multiline ? styles.descriptionInput : undefined}
+          />
+        );
+      }
+
+      return null;
+    },
+    [
+      allowNavigation,
+      document,
+      errorFieldKey,
+      fields,
+      shakeToken,
+      styles.descriptionInput,
+      t,
+      updateField,
+    ]
+  );
+
+  const listHeader = useMemo(() => {
+    if (!document || !display) {
+      return null;
+    }
+
+    const editHint = useDesignEditor
+      ? t('document.editHint')
+      : document.hasNativeAcroForm
+        ? t('import.formHint')
+        : formFieldCount > 0
+          ? t('import.detectedFieldsHint')
+          : t('import.flatMessage');
+
+    return (
+      <View style={styles.headerBlock}>
+        <LinearGradient
+          colors={[display.accentColor, display.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.typeBanner}
+        >
+          <TemplateIconBadge
+            icon={display.icon}
+            title={display.title}
+            size={15}
+            color="#ffffff"
+            titleStyle={styles.typeBannerText}
+          />
+        </LinearGradient>
+
+        <ThemedText themeColor="textSecondary" style={styles.hint}>
+          {editHint}
+        </ThemedText>
+
+        {useDesignEditor && template ? (
+          <PdfLayoutPicker
+            value={pdfStyle}
+            accentColor={template.accentColor}
+            gradientEnd={template.gradientEnd}
+            onChange={setPdfStyle}
+          />
+        ) : null}
+      </View>
+    );
+  }, [
+    display,
+    document,
+    formFieldCount,
+    pdfStyle,
+    styles.headerBlock,
+    styles.hint,
+    styles.typeBanner,
+    styles.typeBannerText,
+    t,
+    template,
+    useDesignEditor,
+  ]);
 
   if (loading) {
     return (
@@ -275,7 +794,7 @@ export default function EditDocumentScreen() {
     );
   }
 
-  if (notFound || !document) {
+  if (notFound || !document || !display) {
     return (
       <ThemedView style={styles.centered}>
         <ThemedText type="subtitle">{t('document.notFound')}</ThemedText>
@@ -284,20 +803,12 @@ export default function EditDocumentScreen() {
     );
   }
 
-  const display = getDocumentDisplayInfo(document, template);
-  const isFormImport = isImportedFormDocument(document);
-
   return (
     <>
       <Stack.Screen
         options={{
           title: `${t('document.editTitle')} · ${display.title}`,
-          headerRight: () => (
-            <EditorOverflowMenu
-              onGoHome={() => navigateAfterExit('home')}
-              onOpenLibrary={() => navigateAfterExit('library')}
-            />
-          ),
+          headerRight,
         }}
       />
 
@@ -307,92 +818,74 @@ export default function EditDocumentScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
         >
-          <ScrollView
-            ref={scrollRef}
-            contentContainerStyle={[
-              styles.content,
-              layout.contentStyle,
-              { paddingBottom: insets.bottom + Spacing.four },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <LinearGradient
-              colors={[display.accentColor, display.gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.typeBanner}
-            >
-              <TemplateIconBadge
-                icon={display.icon}
-                title={display.title}
-                size={15}
-                color="#ffffff"
-                titleStyle={styles.typeBannerText}
+          <View style={styles.flex}>
+            <View style={styles.flex}>
+              <FlatList
+                ref={listRef as RefObject<FlatList<EditorRow>>}
+                data={rows}
+                keyExtractor={(item) => item.key}
+                renderItem={renderItem}
+                ListHeaderComponent={listHeader}
+                contentContainerStyle={[
+                  styles.content,
+                  layout.contentStyle,
+                  { paddingBottom: Spacing.four, paddingRight: 48 },
+                ]}
+                ItemSeparatorComponent={ListSeparator}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                onContentSizeChange={(_width, height) => {
+                  contentHeightRef.current = height;
+                }}
+                onLayout={(event) => {
+                  viewportHeightRef.current = event.nativeEvent.layout.height;
+                }}
+                removeClippedSubviews
+                initialNumToRender={12}
+                maxToRenderPerBatch={10}
+                windowSize={9}
+                updateCellsBatchingPeriod={50}
+                extraData={`${errorFieldKey}:${shakeToken}`}
+                onScrollToIndexFailed={(info) => {
+                  listRef.current?.scrollToOffset({
+                    offset: Math.max(0, info.averageItemLength * info.index),
+                    animated: false,
+                  });
+                }}
               />
-            </LinearGradient>
 
-            <ThemedText themeColor="textSecondary" style={styles.hint}>
-              {isFormImport ? t('import.formHint') : t('document.editHint')}
-            </ThemedText>
+              {jumpingToEnd ? (
+                <View style={styles.jumpOverlay} pointerEvents="auto">
+                  <LoadingState />
+                </View>
+              ) : null}
 
-            {!isFormImport && template ? (
-              <PdfLayoutPicker
-                value={pdfStyle}
-                accentColor={template.accentColor}
-                gradientEnd={template.gradientEnd}
-                onChange={setPdfStyle}
-              />
-            ) : null}
-
-            <View
-              style={styles.form}
-              onLayout={(event) => setFormLayoutY(event.nativeEvent.layout.y)}
-            >
-              {isFormImport && document.formFields
-                ? document.formFields.map((field) => (
-                    <View
-                      key={field.name}
-                      onLayout={(event) =>
-                        setFieldLayoutY(field.name, event.nativeEvent.layout.y)
-                      }
-                    >
-                      <PdfFormFieldInput
-                        field={field}
-                        value={fields[field.name] ?? ''}
-                        onChange={(value) => updateField(field.name, value)}
-                        error={errorFieldKey === field.name}
-                        shakeToken={errorFieldKey === field.name ? shakeToken : 0}
-                      />
-                    </View>
-                  ))
-                : display.fields.map((field) => (
-                    <View
-                      key={field.key}
-                      onLayout={(event) =>
-                        setFieldLayoutY(field.key, event.nativeEvent.layout.y)
-                      }
-                    >
-                      <ValidatedFormField
-                        fieldKey={field.key}
-                        kind={field.kind}
-                        label={field.label}
-                        value={fields[field.key] ?? ''}
-                        required={field.required}
-                        error={errorFieldKey === field.key}
-                        shakeToken={errorFieldKey === field.key ? shakeToken : 0}
-                        onChangeText={(value) => updateField(field.key, value)}
-                        placeholder={field.placeholder}
-                        multiline={field.multiline}
-                        numberOfLines={field.multiline ? 4 : 1}
-                        textAlignVertical={field.multiline ? 'top' : 'center'}
-                        style={field.multiline ? styles.descriptionInput : undefined}
-                      />
-                    </View>
-                  ))}
+              {!jumpingToEnd ? (
+                <ScrollEdgeFab
+                  ref={scrollFabRef}
+                  colors={colors}
+                  onScrollToTop={scrollToTop}
+                  onScrollToBottom={() => {
+                    void scrollToBottom();
+                  }}
+                  topLabel={t('common.scrollToTop')}
+                  bottomLabel={t('common.scrollToBottom')}
+                />
+              ) : null}
             </View>
 
-            <View style={styles.actions}>
+            <View
+              style={[
+                styles.footer,
+                {
+                  paddingBottom: Math.max(insets.bottom, 12),
+                  borderTopColor: colors.border,
+                  backgroundColor: colors.background,
+                },
+              ]}
+            >
               <PrimaryButton
                 label={t('common.save')}
                 onPress={() => void saveDocument()}
@@ -405,7 +898,7 @@ export default function EditDocumentScreen() {
                 disabled={saving}
               />
             </View>
-          </ScrollView>
+          </View>
         </KeyboardAvoidingView>
       </ThemedView>
     </>
@@ -422,7 +915,10 @@ function createStyles(_colors: ThemeColors) {
     },
     content: {
       padding: Spacing.four,
+    },
+    headerBlock: {
       gap: Spacing.four,
+      marginBottom: Spacing.three,
     },
     typeBanner: {
       borderRadius: AppDesign.radius.md,
@@ -435,9 +931,6 @@ function createStyles(_colors: ThemeColors) {
       fontWeight: '800',
       fontSize: 15,
     },
-    form: {
-      gap: Spacing.three,
-    },
     hint: {
       lineHeight: 22,
     },
@@ -445,9 +938,18 @@ function createStyles(_colors: ThemeColors) {
       minHeight: 120,
       paddingTop: Spacing.two + 2,
     },
-    actions: {
+    footer: {
       gap: Spacing.two,
-      marginTop: Spacing.two,
+      paddingHorizontal: Spacing.four,
+      paddingTop: Spacing.three,
+      borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    jumpOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 8,
+      backgroundColor: 'transparent',
     },
     centered: {
       flex: 1,

@@ -88,6 +88,14 @@ export async function deleteTemplate(templateId: string): Promise<boolean> {
   }
 
   await writeSavedTemplates(savedTemplates.filter((item) => item.id !== templateId));
+
+  try {
+    const { deletePdfForTemplate } = await import('@/lib/pdf-file-storage');
+    await deletePdfForTemplate(templateId);
+  } catch {
+    // Template PDF may not exist for HTML templates.
+  }
+
   return true;
 }
 

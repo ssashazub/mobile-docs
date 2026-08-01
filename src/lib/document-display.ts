@@ -8,6 +8,18 @@ export function isImportedFormDocument(document: Document): boolean {
   return document.source === 'imported-form';
 }
 
+/** Document is tied to an in-app template (created or restored), not a plain external PDF. */
+export function isAppTemplateDocument(document: Document): boolean {
+  return (
+    Boolean(document.templateId) && document.templateId !== IMPORTED_FORM_TEMPLATE_ID
+  );
+}
+
+/** External PDF import without an app template (flat / AcroForm file). */
+export function isExternalPdfImport(document: Document): boolean {
+  return isImportedFormDocument(document) && !isAppTemplateDocument(document);
+}
+
 export function getDocumentDisplayInfo(
   document: Document,
   template: DocumentTemplate | null | undefined
@@ -18,6 +30,22 @@ export function getDocumentDisplayInfo(
   gradientEnd: string;
   fields: TemplateField[];
 } {
+  // PDF-backed / restored app templates keep their template branding.
+  if (
+    isImportedFormDocument(document) &&
+    template &&
+    document.templateId !== IMPORTED_FORM_TEMPLATE_ID
+  ) {
+    const icon = normalizeTemplateIcon(template);
+    return {
+      icon,
+      title: template.title,
+      accentColor: template.accentColor,
+      gradientEnd: template.gradientEnd,
+      fields: template.fields,
+    };
+  }
+
   if (isImportedFormDocument(document) && document.formFields) {
     return {
       icon: IMPORTED_FORM_DISPLAY.icon,
