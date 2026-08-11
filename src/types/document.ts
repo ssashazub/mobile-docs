@@ -1,7 +1,10 @@
+import type { PdfOverlayFontId } from '@/constants/overlay-fonts';
 import type { PdfStyle } from '@/types/template';
 import type { FieldInputKind } from '@/types/field-validation';
 
 export type DocumentSource = 'template' | 'imported-form';
+
+export type { PdfOverlayFontId };
 
 export type PdfFormFieldType = 'text' | 'checkbox' | 'radio' | 'dropdown' | 'other';
 
@@ -32,6 +35,8 @@ export type PdfFormField = {
   /** Original PDF text was bold — keep weight when editing/exporting. */
   bold?: boolean;
   align?: 'left' | 'center' | 'right';
+  /** Overlay typeface when drawing filled values (defaults to document font). */
+  fontFamily?: PdfOverlayFontId;
 };
 
 export type PdfOverlayItem = {
@@ -61,5 +66,7 @@ export type Document = {
   overlays?: PdfOverlayItem[];
   hasNativeAcroForm?: boolean;
   importedFileName?: string;
+  /** Default typeface for text filled onto an imported PDF (Times New Roman by default). */
+  overlayFontFamily?: PdfOverlayFontId;
   createdAt: string;
 };

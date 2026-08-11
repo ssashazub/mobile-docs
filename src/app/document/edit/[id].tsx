@@ -1,8 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   View,
   type ListRenderItemInfo,
@@ -12,11 +10,18 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, Stack, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSharedValue } from 'react-native-reanimated';
 
+import {
+  CollapsingSearchBody,
+  CollapsingSearchHeaderBtn,
+  useCollapsingSearchMorph,
+} from '@/components/collapsing-field-search';
 import {
   ScrollEdgeFab,
   type ScrollEdgeFabHandle,
 } from '@/components/ui/scroll-edge-fab';
+import { AppKeyboardAvoiding } from '@/components/ui/app-keyboard-avoiding';
 import { TemplateIconBadge } from '@/components/template-icon-view';
 import { PdfFormFieldInput } from '@/components/pdf-form-field';
 import { ValidatedFormField } from '@/components/validated-form-field';
@@ -34,6 +39,7 @@ import {
   canFillOnDocument,
   ensurePdfBackedForOnDocumentFill,
 } from '@/lib/document-fill-mode';
+import { filterByFieldSearchQuery } from '@/lib/document-search';
 import { getDocuments, updateDocument } from '@/lib/document-storage';
 import { buildDocumentFromFields } from '@/lib/document-helpers';
 import { getFieldValidationAlert } from '@/lib/field-validation-alert';
@@ -49,6 +55,7 @@ import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import * as Haptics from '@/lib/haptics';
 import type { Document, PdfFormField } from '@/types/document';
 import type { DocumentTemplate, PdfStyle, TemplateField } from '@/types/template';
+import type { FieldValidationError } from '@/types/field-validation';
 
 function parseDocumentId(id: string | string[] | undefined): number | null {
   const rawId = Array.isArray(id) ? id[0] : id;
@@ -118,12 +125,17 @@ export default function EditDocumentScreen() {
   const [notFound, setNotFound] = useState(false);
   const [jumpingToEnd, setJumpingToEnd] = useState(false);
   const [menuHintPulseKey, setMenuHintPulseKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [headerSearchExpanded, setHeaderSearchExpanded] = useState(false);
+  const scrollY = useSharedValue(0);
+  const searchMorph = useCollapsingSearchMorph(scrollY);
   const scrollFabRef = useRef<ScrollEdgeFabHandle>(null);
   const offsetYRef = useRef(0);
   const viewportHeightRef = useRef(0);
   const contentHeightRef = useRef(0);
   const jumpGenerationRef = useRef(0);
   const rowsLengthRef = useRef(0);
+  const pendingFocusRef = useRef<FieldValidationError | null>(null);
   const {
     listRef,
     errorFieldKey,
@@ -133,17 +145,46 @@ export default function EditDocumentScreen() {
     focusInvalidField,
   } = useFieldFocusOnError();
 
+  const revealAndFocusInvalidField = useCallback(
+    (error: FieldValidationError) => {
+      if (searchQuery.trim()) {
+        pendingFocusRef.current = error;
+        setSearchQuery('');
+        return;
+      }
+      focusInvalidField(error);
+    },
+    [focusInvalidField, searchQuery]
+  );
+
+  useEffect(() => {
+    if (searchQuery.trim() || !pendingFocusRef.current) {
+      return;
+    }
+    const error = pendingFocusRef.current;
+    pendingFocusRef.current = null;
+    const frame = requestAnimationFrame(() => {
+      focusInvalidField(error);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusInvalidField, searchQuery]);
+
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     offsetYRef.current = contentOffset.y;
     viewportHeightRef.current = layoutMeasurement.height;
     contentHeightRef.current = contentSize.height;
+    scrollY.value = contentOffset.y;
+    // Body search visible again — fold the header field back to the circle.
+    if (headerSearchExpanded && contentOffset.y < searchMorph.searchOffset.value - 12) {
+      setHeaderSearchExpanded(false);
+    }
     scrollFabRef.current?.setMetrics(
       contentOffset.y,
       layoutMeasurement.height,
       contentSize.height
     );
-  }, []);
+  }, [headerSearchExpanded, scrollY, searchMorph.searchOffset]);
 
   const scrollToTop = useCallback(() => {
     jumpGenerationRef.current += 1;
@@ -397,7 +438,7 @@ export default function EditDocumentScreen() {
 
       if (validationError) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        focusInvalidField(validationError);
+        revealAndFocusInvalidField(validationError);
 
         if (validationError.messageKey !== 'required') {
           const alert = getFieldValidationAlert(validationError, t);
@@ -415,7 +456,7 @@ export default function EditDocumentScreen() {
 
       if (validationError) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        focusInvalidField(validationError);
+        revealAndFocusInvalidField(validationError);
 
         if (validationError.messageKey !== 'required') {
           const alert = getFieldValidationAlert(validationError, t);
@@ -429,7 +470,7 @@ export default function EditDocumentScreen() {
 
       if (validationError) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        focusInvalidField(validationError);
+        revealAndFocusInvalidField(validationError);
 
         if (validationError.messageKey !== 'required') {
           const alert = getFieldValidationAlert(validationError, t);
@@ -606,31 +647,6 @@ export default function EditDocumentScreen() {
     void saveDocumentRef.current();
   }, []);
 
-  const headerRight = useCallback(
-    () => (
-      <EditorOverflowMenu
-        onGoHome={() => navigateAfterExitRef.current('home')}
-        onOpenLibrary={() => navigateAfterExitRef.current('library')}
-        onOpenDocumentEditor={
-          canOpenDesignEditor ? handleOverflowOpenDocumentEditor : undefined
-        }
-        onFillOnDocument={
-          showFillOnDocument ? handleOverflowFillOnDocument : undefined
-        }
-        onSave={handleOverflowSave}
-        hintPulseKey={showFillOnDocument ? menuHintPulseKey : -1}
-      />
-    ),
-    [
-      canOpenDesignEditor,
-      handleOverflowFillOnDocument,
-      handleOverflowOpenDocumentEditor,
-      handleOverflowSave,
-      menuHintPulseKey,
-      showFillOnDocument,
-    ]
-  );
-
   const rows = useMemo<EditorRow[]>(() => {
     if (!document || !display) {
       return [];
@@ -663,10 +679,87 @@ export default function EditDocumentScreen() {
     }));
   }, [display, document, formFieldCount, isFormImport, template, useDesignEditor]);
 
+  const canSearchFields = useMemo(
+    () => rows.some((row) => row.kind === 'pdf' || row.kind === 'template'),
+    [rows]
+  );
+
+  const headerRight = useCallback(
+    () => (
+      <View style={styles.headerRightRow}>
+        {canSearchFields ? (
+          <CollapsingSearchHeaderBtn
+            morph={searchMorph}
+            hasQuery={searchQuery.trim().length > 0}
+            expanded={headerSearchExpanded}
+            onExpand={() => setHeaderSearchExpanded(true)}
+            onCollapse={() => setHeaderSearchExpanded(false)}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('document.searchFieldsPlaceholder')}
+            accessibilityLabel={t('document.searchFieldsPlaceholder')}
+          />
+        ) : null}
+        <EditorOverflowMenu
+          onGoHome={() => navigateAfterExitRef.current('home')}
+          onOpenLibrary={() => navigateAfterExitRef.current('library')}
+          onOpenDocumentEditor={
+            canOpenDesignEditor ? handleOverflowOpenDocumentEditor : undefined
+          }
+          onFillOnDocument={
+            showFillOnDocument ? handleOverflowFillOnDocument : undefined
+          }
+          onSave={handleOverflowSave}
+          hintPulseKey={showFillOnDocument ? menuHintPulseKey : -1}
+        />
+      </View>
+    ),
+    [
+      canOpenDesignEditor,
+      canSearchFields,
+      handleOverflowFillOnDocument,
+      handleOverflowOpenDocumentEditor,
+      handleOverflowSave,
+      headerSearchExpanded,
+      menuHintPulseKey,
+      searchMorph,
+      searchQuery,
+      showFillOnDocument,
+      styles.headerRightRow,
+      t,
+    ]
+  );
+
+  const filteredRows = useMemo(() => {
+    if (!canSearchFields) {
+      return rows;
+    }
+
+    return filterByFieldSearchQuery(rows, searchQuery, (row) => {
+      if (row.kind === 'pdf') {
+        return {
+          label: row.field.label,
+          id: row.field.name,
+          value: fields[row.field.name] ?? row.field.value ?? '',
+        };
+      }
+      if (row.kind === 'template') {
+        return {
+          label: row.field.label,
+          id: row.field.key,
+          value: fields[row.field.key] ?? '',
+        };
+      }
+      return {};
+    });
+  }, [canSearchFields, fields, rows, searchQuery]);
+
+  const isSearchingFields = canSearchFields && searchQuery.trim().length > 0;
+
   useEffect(() => {
-    rowsLengthRef.current = rows.length;
+    rowsLengthRef.current = filteredRows.length;
     setFieldIndexes(rows.map((row, index) => ({ key: row.key, index })));
-  }, [rows, setFieldIndexes]);
+  }, [filteredRows.length, rows, setFieldIndexes]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<EditorRow>) => {
@@ -770,13 +863,25 @@ export default function EditDocumentScreen() {
             onChange={setPdfStyle}
           />
         ) : null}
+
+        {canSearchFields ? (
+          <CollapsingSearchBody
+            morph={searchMorph}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('document.searchFieldsPlaceholder')}
+          />
+        ) : null}
       </View>
     );
   }, [
+    canSearchFields,
     display,
     document,
     formFieldCount,
     pdfStyle,
+    searchMorph,
+    searchQuery,
     styles.headerBlock,
     styles.hint,
     styles.typeBanner,
@@ -813,23 +918,31 @@ export default function EditDocumentScreen() {
       />
 
       <ThemedView style={styles.screen}>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-        >
+        <AppKeyboardAvoiding>
           <View style={styles.flex}>
             <View style={styles.flex}>
               <FlatList
                 ref={listRef as RefObject<FlatList<EditorRow>>}
-                data={rows}
+                data={filteredRows}
                 keyExtractor={(item) => item.key}
                 renderItem={renderItem}
                 ListHeaderComponent={listHeader}
+                ListEmptyComponent={
+                  isSearchingFields ? (
+                    <View style={styles.searchEmpty}>
+                      <ThemedText type="subtitle" style={styles.searchEmptyTitle}>
+                        {t('document.searchFieldsEmptyTitle')}
+                      </ThemedText>
+                      <ThemedText themeColor="textSecondary" style={styles.searchEmptyText}>
+                        {t('document.searchFieldsEmptyText')}
+                      </ThemedText>
+                    </View>
+                  ) : null
+                }
                 contentContainerStyle={[
                   styles.content,
                   layout.contentStyle,
-                  { paddingBottom: Spacing.four, paddingRight: 48 },
+                  { paddingBottom: Spacing.four },
                 ]}
                 ItemSeparatorComponent={ListSeparator}
                 keyboardShouldPersistTaps="handled"
@@ -847,7 +960,7 @@ export default function EditDocumentScreen() {
                 maxToRenderPerBatch={10}
                 windowSize={9}
                 updateCellsBatchingPeriod={50}
-                extraData={`${errorFieldKey}:${shakeToken}`}
+                extraData={`${errorFieldKey}:${shakeToken}:${searchQuery}`}
                 onScrollToIndexFailed={(info) => {
                   listRef.current?.scrollToOffset({
                     offset: Math.max(0, info.averageItemLength * info.index),
@@ -899,7 +1012,7 @@ export default function EditDocumentScreen() {
               />
             </View>
           </View>
-        </KeyboardAvoidingView>
+        </AppKeyboardAvoiding>
       </ThemedView>
     </>
   );
@@ -920,6 +1033,12 @@ function createStyles(_colors: ThemeColors) {
       gap: Spacing.four,
       marginBottom: Spacing.three,
     },
+    headerRightRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      flexShrink: 0,
+    },
     typeBanner: {
       borderRadius: AppDesign.radius.md,
       paddingVertical: 14,
@@ -937,6 +1056,19 @@ function createStyles(_colors: ThemeColors) {
     descriptionInput: {
       minHeight: 120,
       paddingTop: Spacing.two + 2,
+    },
+    searchEmpty: {
+      paddingVertical: Spacing.five,
+      paddingHorizontal: Spacing.three,
+      alignItems: 'center',
+      gap: Spacing.two,
+    },
+    searchEmptyTitle: {
+      textAlign: 'center',
+    },
+    searchEmptyText: {
+      textAlign: 'center',
+      lineHeight: 20,
     },
     footer: {
       gap: Spacing.two,

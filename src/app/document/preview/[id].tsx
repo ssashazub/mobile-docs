@@ -533,7 +533,7 @@ function createStyles(colors: ThemeColors) {
       flex: 1,
       borderRadius: 0,
       borderWidth: 0,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       overflow: 'hidden',
     },
     previewMeta: {
@@ -626,7 +626,7 @@ function createStyles(colors: ThemeColors) {
       gap: 16,
       padding: 20,
       borderRadius: AppDesign.radius.lg,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       ...AppDesign.shadow,
     },
     dialogTitle: {

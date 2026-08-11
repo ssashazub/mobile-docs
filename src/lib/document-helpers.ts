@@ -1,4 +1,5 @@
 import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
+import { DEFAULT_OVERLAY_FONT, normalizeOverlayFontId } from '@/constants/overlay-fonts';
 import { t } from '@/i18n';
 import { getTemplateById } from '@/lib/template-storage';
 import { isCheckboxChecked } from '@/lib/pdf-form';
@@ -21,6 +22,7 @@ type LegacyDocument = {
   overlays?: Document['overlays'];
   hasNativeAcroForm?: boolean;
   importedFileName?: string;
+  overlayFontFamily?: Document['overlayFontFamily'];
   createdAt: string;
 };
 
@@ -55,6 +57,10 @@ export function normalizeDocument(raw: LegacyDocument): Document {
       raw.hasNativeAcroForm ??
       (raw.source === 'imported-form' && (formFields?.length ?? 0) > 0),
     importedFileName: raw.importedFileName,
+    overlayFontFamily:
+      raw.source === 'imported-form' || raw.overlayFontFamily
+        ? normalizeOverlayFontId(raw.overlayFontFamily)
+        : undefined,
     createdAt: raw.createdAt,
   };
 }
@@ -122,6 +128,7 @@ export function buildImportedFormDocument(
     source: 'imported-form',
     originalPdfUri,
     importedFileName: fileName,
+    overlayFontFamily: DEFAULT_OVERLAY_FONT,
     createdAt: new Date().toISOString(),
   };
 }
@@ -141,6 +148,7 @@ export function buildDocumentFromPdfBackedTemplate(
     inputKind: field.kind,
     rect: field.rect,
     origin: 'custom',
+    fontFamily: DEFAULT_OVERLAY_FONT,
   }));
 
   return buildImportedFormDocument(

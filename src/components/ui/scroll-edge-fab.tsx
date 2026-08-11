@@ -11,7 +11,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SymbolView } from 'expo-symbols';
 
-import { AppDesign } from '@/constants/app-design';
 import type { ThemeColors } from '@/constants/theme';
 
 export type ScrollEdgeMode = 'none' | 'start' | 'middle' | 'end';
@@ -31,6 +30,19 @@ type ScrollEdgeFabProps = {
 const SPLIT_GAP = 44;
 const APPEAR_MS = 280;
 const SPLIT_SPRING = { damping: 16, stiffness: 180, mass: 0.7 };
+const FAB_FILL_ALPHA = 0.62;
+
+function colorWithAlpha(color: string, alpha: number): string {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (hex) {
+    const value = hex[1];
+    const r = Number.parseInt(value.slice(0, 2), 16);
+    const g = Number.parseInt(value.slice(2, 4), 16);
+    const b = Number.parseInt(value.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return color;
+}
 
 function modeFromMetrics(
   offsetY: number,
@@ -161,8 +173,8 @@ export const ScrollEdgeFab = memo(
             style={({ pressed }) => [
               styles.fab,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
+                backgroundColor: colorWithAlpha(colors.surface, FAB_FILL_ALPHA),
+                borderColor: colorWithAlpha(colors.border, 0.55),
               },
               pressed && styles.fabPressed,
             ]}
@@ -186,8 +198,8 @@ export const ScrollEdgeFab = memo(
             style={({ pressed }) => [
               styles.fab,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
+                backgroundColor: colorWithAlpha(colors.surface, FAB_FILL_ALPHA),
+                borderColor: colorWithAlpha(colors.border, 0.55),
               },
               pressed && styles.fabPressed,
             ]}
@@ -225,9 +237,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    ...AppDesign.shadow,
+    // Soft overlay — sits on top of full-width fields without reserving layout space.
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   fabPressed: {
-    opacity: 0.85,
+    opacity: 0.72,
   },
 });

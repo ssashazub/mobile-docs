@@ -1,16 +1,19 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, router, useFocusEffect } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
 import { DocumentCard } from '@/components/document-card';
+import { DocumentSearchBar } from '@/components/document-search-bar';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { resolveTemplateForDocument } from '@/lib/document-display';
+import { filterDocumentsByQuery } from '@/lib/document-search';
 import { deleteDocument as deleteStoredDocument, getDocuments } from '@/lib/document-storage';
 import { getTemplates } from '@/lib/template-storage';
 import type { Document } from '@/types/document';
@@ -30,11 +33,18 @@ export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const templatesMap = useMemo(
     () => Object.fromEntries(templates.map((template) => [template.id, template])),
     [templates]
   );
+
+  const filteredDocuments = useMemo(
+    () => filterDocumentsByQuery(documents, searchQuery),
+    [documents, searchQuery]
+  );
+  const isSearching = searchQuery.trim().length > 0;
 
   const loadData = useCallback(async () => {
     const [savedDocuments, loadedTemplates] = await Promise.all([
@@ -66,20 +76,46 @@ export default function DocumentsScreen() {
       <Stack.Screen options={{ title: t('home.listTitle') }} />
       <ScrollView
         contentContainerStyle={[styles.container, layout.listContentStyle]}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {documents.length > 0 ? (
+          <DocumentSearchBar value={searchQuery} onChangeText={setSearchQuery} />
+        ) : null}
+
         <Text style={styles.subtitle}>
-          {documents.length} {pluralDocuments(documents.length)}
+          {isSearching
+            ? `${filteredDocuments.length} / ${documents.length} ${pluralDocuments(documents.length)}`
+            : `${documents.length} ${pluralDocuments(documents.length)}`}
         </Text>
 
         {documents.length === 0 ? (
           <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <SymbolView
+                name={{ ios: 'doc.text.magnifyingglass', android: 'find_in_page', web: 'find_in_page' }}
+                size={30}
+                tintColor={colors.onPrimaryContainer}
+              />
+            </View>
             <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
             <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
           </View>
+        ) : filteredDocuments.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <SymbolView
+                name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
+                size={30}
+                tintColor={colors.onPrimaryContainer}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>{t('home.searchEmptyTitle')}</Text>
+            <Text style={styles.emptyText}>{t('home.searchEmptyText')}</Text>
+          </View>
         ) : (
           <View style={[styles.list, layout.gridStyle]}>
-            {documents.map((doc) => {
+            {filteredDocuments.map((doc) => {
               const template = resolveTemplateForDocument(doc, templatesMap);
 
               return (
@@ -161,7 +197,7 @@ function createStyles(colors: ThemeColors) {
       gap: 10,
     },
     emptyState: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       borderRadius: AppDesign.radius.xl,
       borderWidth: 1,
       borderColor: colors.border,
@@ -169,6 +205,15 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       gap: 8,
       ...AppDesign.cardShadow,
+    },
+    emptyIconWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryContainer,
+      marginBottom: 4,
     },
     emptyTitle: {
       fontSize: 18,

@@ -53,16 +53,26 @@ export default function CreateDocumentTypeScreen() {
             style={({ pressed }) => [styles.manageButton, pressed && styles.pressed]}
             onPress={() => router.push('/templates' as Href)}
           >
-            <View style={styles.manageTitleRow}>
+            <View style={styles.manageIconWrap}>
               <SymbolView
                 name={{ ios: 'slider.horizontal.3', android: 'tune', web: 'tune' }}
                 size={18}
-                tintColor={colors.primary}
+                tintColor={colors.onSecondaryContainer}
                 weight="semibold"
               />
-              <Text style={styles.manageTitle}>{t('create.manageTemplates')}</Text>
             </View>
-            <Text style={styles.manageSubtitle}>{t('create.manageSubtitle')}</Text>
+            <View style={styles.manageTextWrap}>
+              <Text style={styles.manageTitle}>{t('create.manageTemplates')}</Text>
+              <Text style={styles.manageSubtitle}>{t('create.manageSubtitle')}</Text>
+            </View>
+            <View style={styles.manageCount}>
+              <Text style={styles.manageCountText}>{templates.length}</Text>
+            </View>
+            <SymbolView
+              name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+              size={16}
+              tintColor={colors.textMuted}
+            />
           </Pressable>
 
           <View style={[styles.list, layout.gridStyle]}>
@@ -104,26 +114,51 @@ function createStyles(colors: ThemeColors) {
       marginBottom: 2,
     },
     manageButton: {
-      backgroundColor: colors.surface,
-      borderRadius: AppDesign.radius.lg,
-      borderWidth: 1,
-      borderColor: colors.templatesBorder,
-      padding: 16,
-      gap: 4,
-    },
-    manageTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 12,
+      backgroundColor: colors.surfaceContainerLow,
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+      ...AppDesign.softShadow,
+    },
+    manageIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.secondaryContainer,
+      flexShrink: 0,
+    },
+    manageTextWrap: {
+      flex: 1,
+      gap: 2,
     },
     manageTitle: {
       fontSize: 15,
       fontWeight: '800',
-      color: colors.primary,
+      color: colors.text,
     },
     manageSubtitle: {
       fontSize: 13,
       color: colors.textSecondary,
+    },
+    manageCount: {
+      minWidth: 26,
+      height: 26,
+      paddingHorizontal: 6,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceContainer,
+    },
+    manageCountText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.text,
     },
     list: {
       gap: 14,

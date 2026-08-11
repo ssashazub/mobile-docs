@@ -1,10 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,14 +10,17 @@ import {
 import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { TemplateFieldsList } from '@/components/template-field-editor';
 import { TemplateIconPicker } from '@/components/template-icon-picker';
 import { LoadingState } from '@/components/ui/loading-state';
+import { AppKeyboardAvoiding } from '@/components/ui/app-keyboard-avoiding';
 import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { showAppAlert } from '@/components/ui/app-alert';
+import { KeyboardAwareModalFrame } from '@/components/ui/keyboard-aware-modal-frame';
 import { TEMPLATE_COLOR_PRESETS } from '@/constants/template-colors';
 import { AppDesign } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
@@ -322,18 +322,15 @@ export default function EditTemplateScreen() {
           ),
         }}
       />
-      <KeyboardAvoidingView
-        style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-      >
+      <AppKeyboardAvoiding style={styles.screen}>
         <View style={styles.flex}>
-        <ScrollView
-          ref={scrollRef}
+        <KeyboardAwareScrollView
+          ref={scrollRef as never}
+          bottomOffset={24}
           contentContainerStyle={[
             styles.content,
             layout.contentStyle,
-            { paddingBottom: insets.bottom + 24, paddingRight: 48 },
+            { paddingBottom: insets.bottom + 24 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -429,11 +426,11 @@ export default function EditTemplateScreen() {
               disabled={saving}
             />
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
         {scrollOverlay}
         {scrollFab}
         </View>
-      </KeyboardAvoidingView>
+      </AppKeyboardAvoiding>
 
       <Modal
         visible={nameDialogVisible}
@@ -441,7 +438,7 @@ export default function EditTemplateScreen() {
         animationType="fade"
         onRequestClose={() => setNameDialogVisible(false)}
       >
-        <View style={styles.dialogBackdrop}>
+        <KeyboardAwareModalFrame style={styles.dialogBackdrop}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>{t('templates.newTemplateNameTitle')}</Text>
             <TextInput
@@ -471,7 +468,7 @@ export default function EditTemplateScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAwareModalFrame>
       </Modal>
     </>
   );
@@ -485,7 +482,7 @@ function createStyles(colors: ThemeColors) {
     heading: { fontSize: 28, fontWeight: '800', color: colors.text },
     subheading: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       borderRadius: AppDesign.radius.lg,
       borderWidth: 1,
       borderColor: colors.border,
@@ -551,7 +548,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: AppDesign.radius.xl,
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       padding: 18,
       gap: 12,
       ...AppDesign.shadow,

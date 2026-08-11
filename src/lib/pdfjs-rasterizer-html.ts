@@ -24,6 +24,7 @@ export type RasterPageMessage =
         fontSize?: number;
         bold?: boolean;
         align?: 'left' | 'center' | 'right';
+        fontFamily?: 'times' | 'arial' | 'georgia' | 'courier';
       }>;
     }
   | { type: 'done'; total: number }
@@ -43,4 +44,6 @@ export type DetectedPdfField = {
   /** Source glyphs used a bold face. */
   bold?: boolean;
   align?: 'left' | 'center' | 'right';
+  /** Best-match overlay font for this cell. */
+  fontFamily?: 'times' | 'arial' | 'georgia' | 'courier';
 };

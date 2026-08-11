@@ -212,13 +212,55 @@ function buildRasterizerHtml(): string {
         return boldFonts;
       }
 
-      function isBoldTextItem(item, styles, boldFonts) {
-        if (!item) return false;
-        if (item.fontName && boldFonts && boldFonts[item.fontName]) {
+      function looksLikeHeaderOrCode(str) {
+        var s = String(str || '').trim();
+        if (!s) return false;
+        if (/^\\d{3,4}$/.test(s)) return true;
+        if (
+          /^(актив|пасив|разом|усього|итого|всего|баланс)\\b/i.test(s) ||
+          /^[ivxlcіх]{1,8}\\./i.test(s) ||
+          (s.length <= 28 && s === s.toUpperCase() && /[A-ZА-ЯІЇЄҐ]{3,}/.test(s))
+        ) {
           return true;
         }
+        return false;
+      }
+
+      function looksLikeAmountText(str) {
+        var s = String(str || '').trim();
+        if (!s) return false;
+        if (/^[-–—−]$/.test(s)) return true;
+        return /^-?[\\d\\s]+([.,]\\d+)?$/.test(s) && /\\d/.test(s);
+      }
+
+      function isBoldTextItem(item, styles, boldFonts) {
+        if (!item) return false;
         var style = (styles && item.fontName && styles[item.fontName]) || {};
-        return isBoldFontName(style.fontFamily) || isBoldFontName(item.fontName);
+        // Explicit Bold/Black in the font name is authoritative.
+        if (isBoldFontName(style.fontFamily) || isBoldFontName(item.fontName)) {
+          return true;
+        }
+        // Heuristic boldFonts includes faces shared by row codes AND body amounts.
+        // Only trust it for strings that themselves look like codes/headers —
+        // never for amount cells ("6 506", "-"), or body amounts look fake-bold.
+        if (item.fontName && boldFonts && boldFonts[item.fontName]) {
+          var str = String(item.str || '').trim();
+          if (looksLikeAmountText(str)) return false;
+          return looksLikeHeaderOrCode(str);
+        }
+        return false;
+      }
+
+      function inferOverlayFontId(fontName, fontFamily) {
+        var haystack = String(fontFamily || '') + ' ' + String(fontName || '');
+        haystack = haystack.toLowerCase();
+        if (/courier|mono|consolas|menlo/.test(haystack)) return 'courier';
+        if (/georgia/.test(haystack)) return 'georgia';
+        if (/arial|helvetica|calibri|verdana|tahoma|trebuchet|noto.?sans|dejavu.?sans|liberation.?sans|roboto|segoe|sans/.test(haystack)) {
+          return 'arial';
+        }
+        if (/times|serif|cambria|noto.?serif|liberation.?serif/.test(haystack)) return 'times';
+        return 'times';
       }
 
       function cleanLabel(raw) {
@@ -424,6 +466,7 @@ function buildRasterizerHtml(): string {
         var labelRight = -Infinity;
         var parts = [];
         var fontSum = 0;
+        var fontVotes = {};
 
         for (var i = 0; i < items.length; i++) {
           var item = items[i];
@@ -444,6 +487,9 @@ function buildRasterizerHtml(): string {
             boldChars += str.length;
           }
           fontSum += ih;
+          var style = (styles && item.fontName && styles[item.fontName]) || {};
+          var overlayFont = inferOverlayFontId(item.fontName, style.fontFamily);
+          fontVotes[overlayFont] = (fontVotes[overlayFont] || 0) + str.length;
           labelTop = Math.max(labelTop, iy + ih);
           labelBottom = Math.min(labelBottom, iy);
           labelRight = Math.max(labelRight, ix + iw);
@@ -458,9 +504,28 @@ function buildRasterizerHtml(): string {
         var text = parts.map(function (p) { return p.str; }).join(' ').replace(/\\s+/g, ' ').trim();
         var label = cleanLabel(text.split(/\\n/)[0] || text).slice(0, 80);
         var fontSize = count > 0 ? fontSum / count : Math.min(8, Math.max(5.5, rect.height * 0.5));
-        // Never let detected size exceed what fits the cell visually.
-        fontSize = Math.min(fontSize, Math.max(5, rect.height * 0.62));
+        // Only shrink when the cell is clearly taller than the glyphs (table rows).
+        // Text-run boxes are ~fontSize tall — height*0.62 made titles tiny.
+        if (rect.height > fontSize * 1.45) {
+          fontSize = Math.min(fontSize, Math.max(5, rect.height * 0.85));
+        }
         var bold = chars > 0 && boldChars >= chars * 0.4;
+        // Amounts / dashes in tables are regular weight even when they share a
+        // font id with bold row codes.
+        if (looksLikeAmountText(text)) {
+          bold = false;
+        }
+        // Long form values (enterprise names, etc.) are body text, not headers.
+        if (text.length > 24) {
+          bold = false;
+        }
+
+        var fontFamily = 'times';
+        var voteNames = Object.keys(fontVotes);
+        if (voteNames.length > 0) {
+          voteNames.sort(function (a, b) { return fontVotes[b] - fontVotes[a]; });
+          fontFamily = voteNames[0];
+        }
 
         var align = 'left';
         if (parts.length > 0) {
@@ -482,8 +547,8 @@ function buildRasterizerHtml(): string {
             align = 'left';
           }
         } else if (rect.width >= 28 && rect.width <= 200) {
-          // Empty value columns in forms/tables are usually centered.
-          align = 'center';
+          // Empty value columns in forms/tables are usually right-aligned amounts.
+          align = 'right';
         }
 
         return {
@@ -496,12 +561,15 @@ function buildRasterizerHtml(): string {
           fontSize: fontSize,
           bold: bold,
           align: align,
+          fontFamily: fontFamily,
           empty: count === 0
         };
       }
 
       function buildFillRect(cell, inside) {
-        var pad = 1.2;
+        // Keep clear of the grid stroke, but hug glyph ink so whiteout
+        // covers full character height (no leftover flecks).
+        var pad = 0.55;
         var isCheckbox =
           cell.width <= 22 && cell.height <= 22 && Math.abs(cell.width - cell.height) < 6;
 
@@ -516,6 +584,7 @@ function buildRasterizerHtml(): string {
             fontSize: Math.min(inside.fontSize || 9, cell.height * 0.65),
             bold: !!inside.bold,
             align: 'center',
+            fontFamily: inside.fontFamily || 'times',
             checkbox: true
           };
         }
@@ -537,24 +606,32 @@ function buildRasterizerHtml(): string {
               label: inside.label || '',
               value: '',
               fontSize: Math.min(8, Math.max(5.5, belowHeight * 0.45)),
-              bold: !!inside.bold,
+              bold: false,
               align: 'left',
+              fontFamily: inside.fontFamily || 'times',
               checkbox: false
             };
           }
         }
 
         // Table / Smallpdf: edit the whole cell at the original glyph size.
+        // Keep a little extra bottom room inside the cell for descenders.
+        var cellFont = inside.fontSize || 7.5;
+        if (cell.height > cellFont * 1.45) {
+          cellFont = Math.min(cellFont, Math.max(5, cell.height * 0.85));
+        }
         return {
           x: cell.x + pad,
           y: cell.y + pad,
           width: Math.max(8, cell.width - pad * 2),
+          // Stay inside the grid cell so whiteout never eats borders.
           height: Math.max(7, cell.height - pad * 2),
           label: inside.label || '',
           value: inside.value || '',
-          fontSize: Math.min(inside.fontSize || 7.5, Math.max(5, cell.height * 0.58)),
+          fontSize: cellFont,
           bold: !!inside.bold,
           align: inside.align || 'left',
+          fontFamily: inside.fontFamily || 'times',
           checkbox: false
         };
       }
@@ -590,7 +667,8 @@ function buildRasterizerHtml(): string {
               value: fill.value || '',
               fontSize: fill.fontSize,
               bold: !!fill.bold,
-              align: fill.align || 'left'
+              align: fill.align || 'left',
+              fontFamily: fill.fontFamily || 'arial'
             });
           }
 
@@ -620,14 +698,19 @@ function buildRasterizerHtml(): string {
             fields.push({
               pageIndex: pageIndex,
               x: ix - 0.5,
-              y: iy - 0.5,
+              // Slight descender room, but keep tight so we don't bleed into neighbors.
+              y: iy - Math.max(0.8, ih * 0.18),
               width: iw + 1,
-              height: ih + 1,
+              height: ih + Math.max(0.8, ih * 0.18) + Math.max(0.4, ih * 0.06),
               label: cleanLabel(str).slice(0, 80),
               value: str,
               fontSize: ih,
               bold: isBoldTextItem(item, styles, boldFonts),
-              align: 'left'
+              align: 'left',
+              fontFamily: inferOverlayFontId(
+                item.fontName,
+                ((styles && item.fontName && styles[item.fontName]) || {}).fontFamily
+              )
             });
           }
 

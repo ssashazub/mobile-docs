@@ -1,21 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { type Href, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { TemplateIconView } from '@/components/template-icon-view';
 import { ValidatedFormField } from '@/components/validated-form-field';
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { LoadingState } from '@/components/ui/loading-state';
 import { showAppAlert } from '@/components/ui/app-alert';
+import { AppKeyboardAvoiding } from '@/components/ui/app-keyboard-avoiding';
 import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { ThemedView } from '@/components/themed-view';
@@ -293,18 +288,15 @@ export default function CreateDocumentFormScreen() {
         }}
       />
       <ThemedView style={styles.screen}>
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-        >
+        <AppKeyboardAvoiding>
         <View style={styles.flex}>
-        <ScrollView
-          ref={scrollRef}
+        <KeyboardAwareScrollView
+          ref={scrollRef as never}
+          bottomOffset={24}
           contentContainerStyle={[
             styles.content,
             layout.contentStyle,
-            { paddingBottom: insets.bottom + 24, paddingRight: 48 },
+            { paddingBottom: insets.bottom + 24 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -382,11 +374,11 @@ export default function CreateDocumentFormScreen() {
               disabled={saving}
             />
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
         {scrollOverlay}
         {scrollFab}
         </View>
-        </KeyboardAvoidingView>
+        </AppKeyboardAvoiding>
       </ThemedView>
     </>
   );

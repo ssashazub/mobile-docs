@@ -92,23 +92,33 @@ export function formatDateInput(value: string): string {
   return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
 }
 
-export function isValidDateValue(value: string): boolean {
-  const trimmed = value.trim();
-  if (!DATE_DOT_FORMAT.test(trimmed)) {
-    return false;
-  }
+export function formatDateValue(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear());
+  return `${day}.${month}.${year}`;
+}
 
-  const parts = parseDateParts(trimmed);
+export function parseDateValue(value: string): Date | null {
+  const parts = parseDateParts(value.trim());
   if (!parts) {
-    return false;
+    return null;
   }
 
   const date = new Date(parts.year, parts.month - 1, parts.day);
-  return (
-    date.getFullYear() === parts.year &&
-    date.getMonth() === parts.month - 1 &&
-    date.getDate() === parts.day
-  );
+  if (
+    date.getFullYear() !== parts.year ||
+    date.getMonth() !== parts.month - 1 ||
+    date.getDate() !== parts.day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+export function isValidDateValue(value: string): boolean {
+  return parseDateValue(value) !== null;
 }
 
 export function isValidNumberValue(value: string): boolean {

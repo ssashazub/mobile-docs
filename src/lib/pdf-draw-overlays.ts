@@ -1,29 +1,78 @@
-import { PDFDocument, rgb, type PDFFont } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib';
 
+import {
+  DEFAULT_OVERLAY_FONT,
+  normalizeOverlayFontId,
+  overlayFontPdfKind,
+  type PdfOverlayFontId,
+} from '@/constants/overlay-fonts';
+import {
+  formatOverlayDisplayValue,
+  looksLikeNumericValue,
+  numericValuesEqual,
+  resolveOverlayBold,
+  capOverlayFontSize,
+} from '@/lib/overlay-text-format';
+import { coverPdfRectInsideCell } from '@/lib/glyph-cover';
 import { isCheckboxChecked } from '@/lib/pdf-form';
 import { embedUnicodeFont } from '@/lib/pdf-unicode-font';
 import type { Document, PdfFieldRect, PdfFormField, PdfOverlayItem } from '@/types/document';
 
-function clamp(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
+/** Amounts / dashes use only WinAnsi glyphs — Helvetica matches printed forms. */
+function isLatinAmountText(text: string): boolean {
+  return looksLikeNumericValue(text) && /^[-–—−\d\s.,]+$/.test(text.trim());
 }
 
-/** Pick a font size that fits both the cell height and the text width. */
-function fitFontSizeToRect(
-  font: PDFFont,
-  text: string,
-  rect: PdfFieldRect,
-  preferred?: number
-): number {
-  const maxByHeight = clamp(rect.height * 0.62, 5, 12);
-  let size = clamp(preferred ?? maxByHeight, 5, maxByHeight);
-  const maxWidth = Math.max(4, rect.width - 3);
+function resolveFontSize(rect: PdfFieldRect, preferred?: number): number {
+  if (preferred != null && preferred > 0) {
+    return capOverlayFontSize(preferred, rect.height);
+  }
+  return capOverlayFontSize(rect.height * 0.7, rect.height);
+}
 
-  while (size > 5 && font.widthOfTextAtSize(text, size) > maxWidth) {
-    size -= 0.25;
+function whiteoutRect(
+  page: ReturnType<PDFDocument['getPages']>[number],
+  rect: PdfFieldRect,
+  source: string,
+  align: PdfFormField['align'],
+  fontSize?: number
+): void {
+  const dash = /^[-–—−]$/.test(source.trim());
+  if (dash) {
+    // Small wipe for dash only — stay inside the cell.
+    const inner = coverPdfRectInsideCell(rect);
+    const wipeW = Math.min(Math.max(10, rect.width * 0.28), inner.width);
+    const wipeH = Math.min(inner.height, Math.max(6, (fontSize ?? rect.height) * 0.95));
+    let x = inner.x + (inner.width - wipeW) / 2;
+    if (align === 'right') {
+      x = inner.x + inner.width - wipeW;
+    } else if (align === 'left') {
+      x = inner.x;
+    }
+    page.drawRectangle({
+      x,
+      y: inner.y + (inner.height - wipeH) / 2,
+      width: wipeW,
+      height: wipeH,
+      color: rgb(1, 1, 1),
+      borderWidth: 0,
+    });
+    return;
   }
 
-  return size;
+  // Full replace: hug the cell; enlarge slightly when source has descenders.
+  const cover = coverPdfRectInsideCell(rect, {
+    text: source,
+    fontSizePt: fontSize ?? rect.height * 0.7,
+  });
+  page.drawRectangle({
+    x: cover.x,
+    y: cover.y,
+    width: cover.width,
+    height: cover.height,
+    color: rgb(1, 1, 1),
+    borderWidth: 0,
+  });
 }
 
 function drawTextInRect(
@@ -33,6 +82,7 @@ function drawTextInRect(
   text: string,
   options?: {
     whiteout?: boolean;
+    sourceText?: string;
     fontSize?: number;
     align?: PdfFormField['align'];
     bold?: boolean;
@@ -49,36 +99,33 @@ function drawTextInRect(
     return;
   }
 
+  const align = options?.align ?? 'left';
+
   if (options?.whiteout) {
-    page.drawRectangle({
-      x: rect.x + 0.4,
-      y: rect.y + 0.4,
-      width: Math.max(1, rect.width - 0.8),
-      height: Math.max(1, rect.height - 0.8),
-      color: rgb(1, 1, 1),
-      borderWidth: 0,
-    });
+    whiteoutRect(page, rect, options.sourceText ?? '', align, options.fontSize);
   }
 
   if (!trimmed) {
     return;
   }
 
-  const size = fitFontSizeToRect(font, trimmed, rect, options?.fontSize);
+  const size = resolveFontSize(rect, options?.fontSize);
   const textWidth = font.widthOfTextAtSize(trimmed, size);
-  const maxWidth = Math.max(4, rect.width - 3);
-  const align = options?.align ?? 'left';
+  const rightPad = 1.6;
+  const leftPad = 1.4;
 
-  let x = rect.x + 1.5;
+  let x = rect.x + leftPad;
   if (align === 'right') {
-    x = rect.x + rect.width - 1.5 - Math.min(textWidth, maxWidth);
+    x = rect.x + rect.width - rightPad - textWidth;
   } else if (align === 'center') {
-    x = rect.x + (rect.width - Math.min(textWidth, maxWidth)) / 2;
+    x = rect.x + (rect.width - textWidth) / 2;
   }
 
-  const drawX = Math.max(rect.x + 0.5, x);
-  const drawY = rect.y + Math.max(0.8, (rect.height - size) / 2);
-  const color = rgb(0.05, 0.05, 0.05);
+  // Allow slight overflow rather than shrinking (clipped by cell visually in viewers).
+  const drawX = x;
+  // Match typical table baseline (slightly below optical center).
+  const drawY = rect.y + Math.max(0.6, (rect.height - size) * 0.42);
+  const color = rgb(0, 0, 0);
 
   page.drawText(trimmed, {
     x: drawX,
@@ -86,19 +133,16 @@ function drawTextInRect(
     size,
     font,
     color,
-    maxWidth,
   });
 
-  // Faux-bold: second pass with a slight offset (no separate bold TTF required).
   if (options?.bold) {
-    const stroke = Math.max(0.22, size * 0.035);
+    const stroke = Math.max(0.18, size * 0.028);
     page.drawText(trimmed, {
       x: drawX + stroke,
       y: drawY,
       size,
       font,
       color,
-      maxWidth,
     });
   }
 }
@@ -112,7 +156,32 @@ export async function drawDocumentOverlays(
   document: Document
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(pdfBytes);
-  const font = await embedUnicodeFont(pdfDoc);
+  const defaultFontId = normalizeOverlayFontId(
+    document.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
+  );
+  const fontCache = new Map<'sans' | 'serif' | 'helvetica', PDFFont>();
+
+  const fontFor = async (id: PdfOverlayFontId | 'helvetica'): Promise<PDFFont> => {
+    if (id === 'helvetica') {
+      const cached = fontCache.get('helvetica');
+      if (cached) {
+        return cached;
+      }
+      const embedded = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      fontCache.set('helvetica', embedded);
+      return embedded;
+    }
+
+    const kind = overlayFontPdfKind(id);
+    const cached = fontCache.get(kind);
+    if (cached) {
+      return cached;
+    }
+    const embedded = await embedUnicodeFont(pdfDoc, kind);
+    fontCache.set(kind, embedded);
+    return embedded;
+  };
+
   const fields = document.fields ?? {};
   const formFields = document.formFields ?? [];
 
@@ -134,16 +203,30 @@ export async function drawDocumentOverlays(
     const value = fields[field.name] ?? field.value ?? '';
     const source = field.sourceText?.trim() ?? '';
     const trimmed = value.trim();
+    const display = formatOverlayDisplayValue(trimmed, {
+      align: field.align,
+      sourceText: source,
+    });
 
     // Unchanged PDF text — nothing to redraw.
-    if (source && trimmed === source) {
+    if (source && (trimmed === source || numericValuesEqual(trimmed, source))) {
       continue;
     }
+
+    const amountLike = isLatinAmountText(display || source);
+    const font = amountLike
+      ? await fontFor('helvetica')
+      : await fontFor(
+          normalizeOverlayFontId(
+            field.fontFamily ?? document.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
+          )
+        );
 
     if (field.type === 'checkbox') {
       if (isCheckboxChecked(value)) {
         drawTextInRect(pdfDoc, font, rect, 'X', {
           whiteout: Boolean(source),
+          sourceText: source,
           fontSize: field.fontSize ?? rect.height * 0.7,
           align: 'center',
         });
@@ -151,16 +234,18 @@ export async function drawDocumentOverlays(
       continue;
     }
 
-    drawTextInRect(pdfDoc, font, rect, value, {
-      // Cover original PDF glyphs when replaced OR explicitly cleared.
-      whiteout: Boolean(source) ? trimmed !== source : trimmed.length > 0,
+    drawTextInRect(pdfDoc, font, rect, display, {
+      // Only cover when replacing existing printed glyphs (dash / old value).
+      whiteout: Boolean(source) && !numericValuesEqual(trimmed, source),
+      sourceText: source,
       fontSize: field.fontSize,
-      align: field.align,
-      bold: field.bold,
+      align: field.align ?? (amountLike ? 'right' : 'left'),
+      bold: resolveOverlayBold(field, display || source),
     });
   }
 
   const overlays: PdfOverlayItem[] = document.overlays ?? [];
+  const overlayFont = await fontFor(defaultFontId);
   for (const overlay of overlays) {
     const linkedField = overlay.fieldName
       ? formFields.find((field) => field.name === overlay.fieldName)
@@ -180,7 +265,7 @@ export async function drawDocumentOverlays(
 
     drawTextInRect(
       pdfDoc,
-      font,
+      overlayFont,
       {
         pageIndex: overlay.pageIndex,
         x: overlay.x,

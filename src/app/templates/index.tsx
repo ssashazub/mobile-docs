@@ -1,12 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type Href, Stack, router, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DocumentTypeCard } from '@/components/document-type-card';
 import { showAppAlert } from '@/components/ui/app-alert';
-import { AppDesign } from '@/constants/app-design';
+import { AppDesign, AppGradients } from '@/constants/app-design';
 import { type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLayout } from '@/hooks/use-layout';
@@ -49,6 +50,8 @@ export default function TemplatesScreen() {
     );
   };
 
+  const customCount = templates.filter((template) => !template.isBuiltIn).length;
+
   return (
     <>
       <Stack.Screen options={{ title: t('templates.title') }} />
@@ -57,41 +60,90 @@ export default function TemplatesScreen() {
           contentContainerStyle={[styles.container, layout.listContentStyle]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.heading}>{t('templates.heading')}</Text>
-          <Text style={styles.subheading}>{t('templates.subtitle')}</Text>
+          <View style={styles.headingRow}>
+            <View style={styles.headingText}>
+              <Text style={styles.heading}>{t('templates.heading')}</Text>
+              <Text style={styles.subheading}>{t('templates.subtitle')}</Text>
+            </View>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeValue}>{templates.length}</Text>
+              <Text style={styles.countBadgeLabel}>{t('common.fields')}</Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={[styles.statPill, { backgroundColor: colors.primaryContainer }]}>
+              <SymbolView
+                name={{ ios: 'square.grid.2x2.fill', android: 'apps', web: 'apps' }}
+                size={14}
+                tintColor={colors.onPrimaryContainer}
+              />
+              <Text style={[styles.statPillText, { color: colors.onPrimaryContainer }]}>
+                {templates.length - customCount} {t('templates.title')}
+              </Text>
+            </View>
+            <View style={[styles.statPill, { backgroundColor: colors.secondaryContainer }]}>
+              <SymbolView
+                name={{ ios: 'person.fill', android: 'person', web: 'person' }}
+                size={14}
+                tintColor={colors.onSecondaryContainer}
+              />
+              <Text style={[styles.statPillText, { color: colors.onSecondaryContainer }]}>
+                {customCount} {t('templates.createTemplate')}
+              </Text>
+            </View>
+          </View>
 
           <View style={[styles.actionsRow, layout.isTablet && styles.actionsRowTablet]}>
             <Pressable
               style={({ pressed }) => [
-                styles.createButton,
+                styles.createShell,
                 layout.isTablet && styles.actionHalf,
                 pressed && styles.pressed,
               ]}
               onPress={() => router.push('/templates/create' as Href)}
             >
-              <View style={styles.createTitleRow}>
-                <SymbolView
-                  name={{ ios: 'plus', android: 'add', web: 'add' }}
-                  size={18}
-                  tintColor="#ffffff"
-                  weight="semibold"
-                />
-                <Text style={styles.createTitle}>{t('templates.createTemplate')}</Text>
-              </View>
-              <Text style={styles.createSubtitle}>{t('templates.createSubtitle')}</Text>
+              <LinearGradient
+                colors={AppGradients.brand}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.createButton}
+              >
+                <View style={styles.createIconWrap}>
+                  <SymbolView
+                    name={{ ios: 'plus', android: 'add', web: 'add' }}
+                    size={18}
+                    tintColor="#ffffff"
+                    weight="semibold"
+                  />
+                </View>
+                <View style={styles.createTextWrap}>
+                  <Text style={styles.createTitle}>{t('templates.createTemplate')}</Text>
+                  <Text style={styles.createSubtitle}>{t('templates.createSubtitle')}</Text>
+                </View>
+              </LinearGradient>
             </Pressable>
 
             <Pressable
               style={({ pressed }) => [
-                styles.createButton,
                 styles.secondaryButton,
                 layout.isTablet && styles.actionHalf,
                 pressed && styles.pressed,
               ]}
               onPress={() => router.push('/pdf-styles' as Href)}
             >
-              <Text style={styles.secondaryTitle}>{t('pdfStyle.manageTitle')}</Text>
-              <Text style={styles.secondarySubtitle}>{t('pdfStyle.manageSubtitle')}</Text>
+              <View style={[styles.createIconWrap, styles.secondaryIconWrap]}>
+                <SymbolView
+                  name={{ ios: 'paintbrush.fill', android: 'brush', web: 'brush' }}
+                  size={18}
+                  tintColor={colors.primary}
+                  weight="semibold"
+                />
+              </View>
+              <View style={styles.createTextWrap}>
+                <Text style={styles.secondaryTitle}>{t('pdfStyle.manageTitle')}</Text>
+                <Text style={styles.secondarySubtitle}>{t('pdfStyle.manageSubtitle')}</Text>
+              </View>
             </Pressable>
           </View>
 
@@ -128,27 +180,93 @@ function createStyles(colors: ThemeColors) {
     },
     container: {
       padding: 24,
-      gap: 14,
+      gap: 16,
+    },
+    headingRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    headingText: {
+      flex: 1,
+      gap: 4,
     },
     heading: {
       fontSize: 30,
       fontWeight: '800',
       color: colors.text,
+      letterSpacing: -0.4,
     },
     subheading: {
       fontSize: 15,
       lineHeight: 22,
       color: colors.textSecondary,
     },
-    createButton: {
-      backgroundColor: colors.primary,
+    countBadge: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 52,
+      paddingVertical: 8,
       borderRadius: AppDesign.radius.lg,
-      padding: 18,
-      gap: 4,
+      backgroundColor: colors.surfaceContainer,
+    },
+    countBadgeValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    countBadgeLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+    },
+    statsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    statPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: AppDesign.radius.pill,
+    },
+    statPillText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    createShell: {
+      borderRadius: AppDesign.radius.lg,
+      overflow: 'hidden',
       ...AppDesign.shadow,
     },
+    createButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 16,
+    },
+    createIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      flexShrink: 0,
+    },
+    secondaryIconWrap: {
+      backgroundColor: colors.primaryContainer,
+    },
+    createTextWrap: {
+      flex: 1,
+      gap: 2,
+    },
     actionsRow: {
-      gap: 14,
+      gap: 12,
     },
     actionsRowTablet: {
       flexDirection: 'row',
@@ -156,36 +274,34 @@ function createStyles(colors: ThemeColors) {
     actionHalf: {
       flex: 1,
     },
-    createTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
     createTitle: {
       color: '#fff',
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '800',
     },
     createSubtitle: {
       color: 'rgba(255,255,255,0.88)',
-      fontSize: 13,
+      fontSize: 12.5,
     },
     secondaryButton: {
-      backgroundColor: colors.surface,
-      borderWidth: 1.5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surfaceContainerLow,
+      borderRadius: AppDesign.radius.lg,
+      padding: 16,
+      borderWidth: 1,
       borderColor: colors.border,
-      ...AppDesign.cardShadow,
-      shadowOpacity: 0.06,
-      elevation: 1,
+      ...AppDesign.softShadow,
     },
     secondaryTitle: {
       color: colors.text,
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '800',
     },
     secondarySubtitle: {
       color: colors.textSecondary,
-      fontSize: 13,
+      fontSize: 12.5,
     },
     list: {
       gap: 14,

@@ -33,12 +33,17 @@ export function DocumentTypeCard({ template, onPress, onEdit }: DocumentTypeCard
         end={{ x: 1, y: 1 }}
         style={styles.gradientHeader}
       >
-        <TemplateIconView
-          icon={normalizeTemplateIcon(template)}
-          size={30}
-          color="#ffffff"
-          style={styles.heroIcon}
-        />
+        <View style={styles.watermark} pointerEvents="none">
+          <TemplateIconView icon={normalizeTemplateIcon(template)} size={92} color="#ffffff" />
+        </View>
+        <View style={styles.heroIconWrap}>
+          <TemplateIconView
+            icon={normalizeTemplateIcon(template)}
+            size={26}
+            color="#ffffff"
+            style={styles.heroIcon}
+          />
+        </View>
         <View style={styles.headerText}>
           <Text style={styles.title}>{template.title}</Text>
           <Text style={styles.meta}>
@@ -100,10 +105,26 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       gap: 14,
       padding: 20,
+      overflow: 'hidden',
+    },
+    watermark: {
+      position: 'absolute',
+      right: -18,
+      bottom: -26,
+      opacity: 0.16,
+      transform: [{ rotate: '-12deg' }],
+    },
+    heroIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.2)',
     },
     heroIcon: {
-      width: 34,
-      height: 34,
+      width: 26,
+      height: 26,
       alignItems: 'center',
       justifyContent: 'center',
     },

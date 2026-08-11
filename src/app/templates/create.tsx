@@ -1,9 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,12 +9,14 @@ import {
 import { type Href, Stack, router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 import { PdfLayoutPicker } from '@/components/pdf-layout-picker';
 import { TemplateFieldsList } from '@/components/template-field-editor';
 import { TemplateIconPicker } from '@/components/template-icon-picker';
 import { TemplateIconView } from '@/components/template-icon-view';
 import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
+import { AppKeyboardAvoiding } from '@/components/ui/app-keyboard-avoiding';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { showAppAlert } from '@/components/ui/app-alert';
 import { DEFAULT_PDF_STYLE } from '@/constants/pdf-layouts';
@@ -194,18 +193,15 @@ export default function CreateTemplateScreen() {
           ),
         }}
       />
-      <KeyboardAvoidingView
-        style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-      >
+      <AppKeyboardAvoiding style={styles.screen}>
         <View style={styles.flex}>
-        <ScrollView
-          ref={scrollRef}
+        <KeyboardAwareScrollView
+          ref={scrollRef as never}
+          bottomOffset={24}
           contentContainerStyle={[
             styles.content,
             layout.contentStyle,
-            { paddingBottom: insets.bottom + 24, paddingRight: 48 },
+            { paddingBottom: insets.bottom + 24 },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -352,11 +348,11 @@ export default function CreateTemplateScreen() {
               disabled={saving}
             />
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
         {scrollOverlay}
         {scrollFab}
         </View>
-      </KeyboardAvoidingView>
+      </AppKeyboardAvoiding>
     </>
   );
 }
@@ -381,7 +377,7 @@ function createStyles(colors: ThemeColors) {
       width: '47%',
       flexGrow: 1,
       minWidth: 124,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       borderRadius: AppDesign.radius.md,
       borderWidth: 2,
       borderColor: colors.border,
@@ -408,7 +404,7 @@ function createStyles(colors: ThemeColors) {
       color: colors.textSecondary,
     },
     card: {
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       borderRadius: AppDesign.radius.lg,
       borderWidth: 1,
       borderColor: colors.border,

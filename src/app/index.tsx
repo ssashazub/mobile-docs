@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { type Href, router, useFocusEffect } from 'expo-router';
+import { type Href, Stack, router, useFocusEffect } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import * as Haptics from '@/lib/haptics';
 import Animated, {
@@ -20,19 +20,21 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionSheet } from '@/components/ui/action-sheet';
 import { showAppAlert } from '@/components/ui/app-alert';
 import { DocumentCard } from '@/components/document-card';
+import { DocumentSearchBar } from '@/components/document-search-bar';
 import { TemplateIconView } from '@/components/template-icon-view';
-import { AppDesign } from '@/constants/app-design';
+import { AppDesign, AppGradients } from '@/constants/app-design';
 import { Colors, type ThemeColors } from '@/constants/theme';
 import { getBuiltinTemplates } from '@/core/templates/registry';
 import { useI18n } from '@/hooks/use-i18n';
 import { useLayout } from '@/hooks/use-layout';
 import { useTheme } from '@/hooks/use-theme';
 import { resolveTemplateForDocument } from '@/lib/document-display';
+import { filterDocumentsByQuery } from '@/lib/document-search';
 import { deleteDocument as deleteStoredDocument, getDocuments } from '@/lib/document-storage';
 import { ImportCancelledError, pickAndImportPdf } from '@/lib/import-pdf';
 import { getTemplates } from '@/lib/template-storage';
@@ -88,6 +90,7 @@ export default function HomeScreen() {
   const { t, pluralDocuments, locale } = useI18n();
   const colors = useTheme();
   const layout = useLayout();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
@@ -96,14 +99,28 @@ export default function HomeScreen() {
   const [tabletMainHeight, setTabletMainHeight] = useState(0);
   const [docsHeaderHeight, setDocsHeaderHeight] = useState(0);
   const [docsContentHeight, setDocsContentHeight] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
 
+  const sortedDocuments = useMemo(
+    () =>
+      [...documents].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [documents]
+  );
+  const isSearching = searchQuery.trim().length > 0;
+  const filteredDocuments = useMemo(
+    () => filterDocumentsByQuery(sortedDocuments, searchQuery),
+    [searchQuery, sortedDocuments]
+  );
   const recentDocuments = useMemo(() => {
-    const sorted = [...documents].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-    return layout.isTablet ? sorted : sorted.slice(0, 3);
-  }, [documents, layout.isTablet]);
-  const hasMoreDocuments = !layout.isTablet && documents.length > 3;
+    if (isSearching) {
+      return filteredDocuments;
+    }
+    return layout.isTablet ? sortedDocuments : sortedDocuments.slice(0, 3);
+  }, [filteredDocuments, isSearching, layout.isTablet, sortedDocuments]);
+  const hasMoreDocuments =
+    !isSearching && documents.length > (layout.isTablet ? 9 : 3);
   const tabletDocsViewportHeight =
     tabletMainHeight > 0 ? Math.max(120, tabletMainHeight - docsHeaderHeight - 40) : 0;
   const tabletDocumentsOverflow =
@@ -164,26 +181,18 @@ export default function HomeScreen() {
 
   const brandBar = (
     <Animated.View entering={FadeInDown.duration(420).springify()} style={styles.topBar}>
-      <View style={styles.brandBlock}>
-        <LinearGradient
-          colors={['#6366f1', '#4f46e5']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.brandMark}
-        >
-          <SymbolView
-            name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }}
-            size={18}
-            tintColor="#fff"
-          />
-        </LinearGradient>
-        <View style={styles.brandText}>
-          <Text style={styles.brandName}>Mobile Docs</Text>
-          <Text style={styles.brandMeta}>
-            {documents.length} {pluralDocuments(documents.length)}
-          </Text>
-        </View>
-      </View>
+      <LinearGradient
+        colors={AppGradients.brand}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.brandMark}
+      >
+        <SymbolView
+          name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }}
+          size={18}
+          tintColor="#fff"
+        />
+      </LinearGradient>
 
       <ScalePressable
         onPress={() => router.push('/settings' as Href)}
@@ -191,13 +200,67 @@ export default function HomeScreen() {
       >
         <SymbolView
           name={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' }}
-          size={22}
+          size={20}
           tintColor={colors.primary}
           weight="semibold"
         />
       </ScalePressable>
     </Animated.View>
   );
+
+  const headerGradientColors =
+    colors.background === Colors.dark.background
+      ? (['#05050a', '#16122a', '#4a3390', '#2a1f55', '#14122a', colors.background] as const)
+      : (['#7c6cf0', '#9b87f5', '#c4b5fd', '#ddd6fe', '#eef1ff', colors.background] as const);
+
+  const actionRail = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.actionRailContent}
+      style={styles.actionRail}
+    >
+      <ActionTile
+        title={t('home.actionCreate')}
+        icon={{ ios: 'plus', android: 'add', web: 'add' }}
+        accent="#fff"
+        soft={colors.primary}
+        gradient
+        onPress={() => router.push('/create' as Href)}
+        styles={styles}
+        colors={colors}
+      />
+      <ActionTile
+        title={t('home.actionImport')}
+        icon={{
+          ios: 'square.and.arrow.down.fill',
+          android: 'download',
+          web: 'download',
+        }}
+        accent={colors.importTitle}
+        soft="#ccfbf1"
+        softDark="#134e4a"
+        loading={importing}
+        onPress={handleImportPdf}
+        styles={styles}
+        colors={colors}
+      />
+      <ActionTile
+        title={t('home.actionTemplates')}
+        icon={{
+          ios: 'square.grid.2x2.fill',
+          android: 'dashboard_customize',
+          web: 'dashboard_customize',
+        }}
+        accent={colors.primary}
+        soft={colors.primarySoft}
+        onPress={() => router.push('/templates' as Href)}
+        styles={styles}
+        colors={colors}
+      />
+    </ScrollView>
+  );
+
 
   const documentsHeader = (
     <View
@@ -206,36 +269,40 @@ export default function HomeScreen() {
         setDocsHeaderHeight(event.nativeEvent.layout.height);
       }}
     >
-      <Text style={styles.listTitle}>{t('home.listTitle')}</Text>
-      {showViewAllDocuments ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('home.viewAll')}
-          onPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push('/documents' as Href);
-          }}
-          style={({ pressed }) => [styles.viewAllButton, pressed && styles.viewAllPressed]}
-        >
-          <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
-          <View style={styles.viewAllCount}>
-            <Text style={styles.viewAllCountText}>{documents.length}</Text>
-          </View>
-          <SymbolView
-            name={{
-              ios: 'chevron.right',
-              android: 'chevron_right',
-              web: 'chevron_right',
+      <View style={styles.listHeaderTop}>
+        <Text style={styles.listTitle}>{t('home.listTitle')}</Text>
+        {showViewAllDocuments ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('home.viewAll')}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/documents' as Href);
             }}
-            size={15}
-            tintColor={colors.primary}
-          />
-        </Pressable>
-      ) : documents.length > 0 ? (
-        <View style={styles.countChip}>
-          <Text style={styles.countChipText}>{documents.length}</Text>
-        </View>
-      ) : null}
+            style={({ pressed }) => [styles.viewAllButton, pressed && styles.viewAllPressed]}
+          >
+            <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
+            <View style={styles.viewAllCount}>
+              <Text style={styles.viewAllCountText}>{documents.length}</Text>
+            </View>
+            <SymbolView
+              name={{
+                ios: 'chevron.right',
+                android: 'chevron_right',
+                web: 'chevron_right',
+              }}
+              size={15}
+              tintColor={colors.primary}
+            />
+          </Pressable>
+        ) : documents.length > 0 ? (
+          <View style={styles.countChip}>
+            <Text style={styles.countChipText}>
+              {isSearching ? filteredDocuments.length : documents.length}
+            </Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -254,6 +321,18 @@ export default function HomeScreen() {
           <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
           <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
         </ScalePressable>
+      ) : recentDocuments.length === 0 ? (
+        <View style={[styles.emptyState, styles.emptyStateTablet]}>
+          <View style={styles.searchEmptyIcon}>
+            <SymbolView
+              name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
+              size={28}
+              tintColor={colors.onPrimaryContainer}
+            />
+          </View>
+          <Text style={styles.emptyTitle}>{t('home.searchEmptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('home.searchEmptyText')}</Text>
+        </View>
       ) : (
         <View style={styles.tabletDocsList}>
           {recentDocuments.map((doc) => {
@@ -277,9 +356,57 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
       {layout.isTablet ? (
         <View style={[styles.container, styles.containerTablet, styles.tabletScreen]}>
-          {brandBar}
+          <View style={[styles.tabletHeaderHero, { paddingTop: Math.max(insets.top, 12) }]}>
+            <LinearGradient
+              colors={headerGradientColors}
+              locations={[0, 0.1, 0.32, 0.52, 0.78, 1]}
+              start={{ x: 0.2, y: 0 }}
+              end={{ x: 0.85, y: 1 }}
+              style={styles.headerGradientFill}
+            />
+            <Animated.View entering={FadeInDown.duration(420).springify()} style={styles.tabletTopBar}>
+              <LinearGradient
+                colors={AppGradients.brand}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.brandMark}
+              >
+                <SymbolView
+                  name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }}
+                  size={18}
+                  tintColor="#fff"
+                />
+              </LinearGradient>
+
+              <View style={styles.tabletHeaderMeta}>
+                <Text style={styles.tabletHeaderTitle}>Mobile Docs</Text>
+                <Text style={styles.tabletHeaderCount}>
+                  {documents.length} {pluralDocuments(documents.length)}
+                  {' · '}
+                  {templates.length} {t('home.actionTemplates').toLocaleLowerCase()}
+                </Text>
+              </View>
+
+              <View style={styles.tabletHeaderSearch}>
+                <DocumentSearchBar value={searchQuery} onChangeText={setSearchQuery} />
+              </View>
+
+              <ScalePressable
+                onPress={() => router.push('/settings' as Href)}
+                style={styles.iconButton}
+              >
+                <SymbolView
+                  name={{ ios: 'gearshape.fill', android: 'settings', web: 'settings' }}
+                  size={20}
+                  tintColor={colors.primary}
+                  weight="semibold"
+                />
+              </ScalePressable>
+            </Animated.View>
+          </View>
 
           <View style={styles.tabletBody}>
             <View style={styles.tabletSidebar}>
@@ -292,7 +419,7 @@ export default function HomeScreen() {
                   style={styles.createShell}
                 >
                   <LinearGradient
-                    colors={['#6366f1', '#4f46e5', '#4338ca']}
+                    colors={AppGradients.brand}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.createGradientTablet}
@@ -384,6 +511,7 @@ export default function HomeScreen() {
                   onContentSizeChange={(_width, height) => {
                     setDocsContentHeight(height);
                   }}
+                  keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled
                 >
@@ -395,89 +523,49 @@ export default function HomeScreen() {
         </View>
       ) : (
       <ScrollView
-        contentContainerStyle={[styles.container, layout.listContentStyle]}
+        contentContainerStyle={[styles.containerPhone, layout.listContentStyle]}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {brandBar}
+        <View style={styles.headerHero}>
+          <LinearGradient
+            colors={headerGradientColors}
+            locations={[0, 0.1, 0.32, 0.52, 0.78, 1]}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={styles.headerGradientFill}
+          />
+          <View style={[styles.phonePad, { paddingTop: Math.max(insets.top, 8) + 4 }]}>
+            {brandBar}
 
-          <>
-            <Animated.View entering={FadeInDown.delay(110).duration(480).springify()}>
-              <ScalePressable
-                onPress={() => router.push('/create' as Href)}
-                style={styles.createShell}
-              >
-                <LinearGradient
-                  colors={['#6366f1', '#4f46e5', '#4338ca']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.createGradient}
-                >
-                  <View style={styles.createIcon}>
-                    <SymbolView
-                      name={{ ios: 'plus', android: 'add', web: 'add' }}
-                      size={26}
-                      tintColor="#fff"
-                      weight="bold"
-                    />
-                  </View>
-                  <View style={styles.createTextWrap}>
-                    <Text style={styles.createTitle}>{t('home.createDocument')}</Text>
-                    <Text style={styles.createSubtitle}>{t('home.createSubtitle')}</Text>
-                  </View>
-                  <SymbolView
-                    name={{
-                      ios: 'chevron.right',
-                      android: 'arrow_forward',
-                      web: 'arrow_forward',
-                    }}
-                    size={22}
-                    tintColor="rgba(255,255,255,0.9)"
-                  />
-                </LinearGradient>
-              </ScalePressable>
-            </Animated.View>
+            {documents.length > 0 ? (
+              <Animated.View entering={FadeInDown.delay(40).duration(400).springify()}>
+                <DocumentSearchBar value={searchQuery} onChangeText={setSearchQuery} />
+              </Animated.View>
+            ) : null}
 
             <Animated.View
-              entering={FadeInDown.delay(160).duration(480).springify()}
-              style={styles.toolsCard}
+              entering={FadeInDown.delay(80).duration(450).springify()}
+              style={styles.greeting}
             >
-              <QuickAction
-                title={t('home.importPdf')}
-                subtitle={t('home.importPdfSubtitle')}
-                icon={{
-                  ios: 'square.and.arrow.down.fill',
-                  android: 'download',
-                  web: 'download',
-                }}
-                accent={colors.importTitle}
-                soft="#ccfbf1"
-                softDark="#134e4a"
-                loading={importing}
-                onPress={handleImportPdf}
-                styles={styles}
-                colors={colors}
-              />
-              <View style={styles.toolsDivider} />
-              <QuickAction
-                title={t('home.templatesTitle')}
-                subtitle={t('home.templatesSubtitle')}
-                icon={{
-                  ios: 'square.grid.2x2.fill',
-                  android: 'dashboard_customize',
-                  web: 'dashboard_customize',
-                }}
-                accent={colors.primary}
-                soft={colors.primarySoft}
-                onPress={() => router.push('/templates' as Href)}
-                styles={styles}
-                colors={colors}
-              />
+              <Text style={styles.greetingTitle}>Mobile Docs</Text>
+              <Text style={styles.greetingMeta}>
+                {documents.length} {pluralDocuments(documents.length)}
+                {' · '}
+                {templates.length} {t('home.actionTemplates').toLocaleLowerCase()}
+              </Text>
             </Animated.View>
 
-            <Animated.View
-              entering={FadeInDown.delay(210).duration(450).springify()}
-              style={styles.listHeader}
-            >
+            <Animated.View entering={FadeInDown.delay(120).duration(450).springify()}>
+              {actionRail}
+            </Animated.View>
+          </View>
+
+          <Animated.View
+            entering={FadeInDown.delay(180).duration(480).springify()}
+            style={styles.docsSheet}
+          >
+            <View style={styles.listHeaderTop}>
               <Text style={styles.listTitle}>{t('home.listTitle')}</Text>
               {hasMoreDocuments ? (
                 <Pressable
@@ -505,26 +593,38 @@ export default function HomeScreen() {
                 </Pressable>
               ) : documents.length > 0 ? (
                 <View style={styles.countChip}>
-                  <Text style={styles.countChipText}>{documents.length}</Text>
+                  <Text style={styles.countChipText}>
+                    {isSearching ? filteredDocuments.length : documents.length}
+                  </Text>
                 </View>
               ) : null}
-            </Animated.View>
+            </View>
 
             {documents.length === 0 ? (
-              <Animated.View entering={FadeInDown.delay(250).duration(500).springify()}>
-                <ScalePressable
-                  onPress={() => router.push('/create' as Href)}
-                  style={styles.emptyState}
-                >
-                  <EmptyDocumentsArt
-                    styles={styles}
-                    locale={locale}
-                    showcaseLabel={t('home.emptyShowcase')}
+              <ScalePressable
+                onPress={() => router.push('/create' as Href)}
+                style={styles.emptyState}
+              >
+                <EmptyDocumentsArt
+                  styles={styles}
+                  locale={locale}
+                  showcaseLabel={t('home.emptyShowcase')}
+                />
+                <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
+                <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
+              </ScalePressable>
+            ) : recentDocuments.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={styles.searchEmptyIcon}>
+                  <SymbolView
+                    name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }}
+                    size={28}
+                    tintColor={colors.onPrimaryContainer}
                   />
-                  <Text style={styles.emptyTitle}>{t('home.emptyTitle')}</Text>
-                  <Text style={styles.emptyText}>{t('home.emptyText')}</Text>
-                </ScalePressable>
-              </Animated.View>
+                </View>
+                <Text style={styles.emptyTitle}>{t('home.searchEmptyTitle')}</Text>
+                <Text style={styles.emptyText}>{t('home.searchEmptyText')}</Text>
+              </View>
             ) : (
               <View style={styles.list}>
                 {recentDocuments.map((doc, index) => {
@@ -547,7 +647,8 @@ export default function HomeScreen() {
                 })}
               </View>
             )}
-          </>
+          </Animated.View>
+        </View>
       </ScrollView>
       )}
 
@@ -591,6 +692,65 @@ export default function HomeScreen() {
   );
 }
 
+function ActionTile({
+  title,
+  icon,
+  accent,
+  soft,
+  softDark,
+  gradient,
+  loading,
+  onPress,
+  styles,
+  colors,
+}: {
+  title: string;
+  icon: IconName;
+  accent: string;
+  soft: string;
+  softDark?: string;
+  gradient?: boolean;
+  loading?: boolean;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+  colors: ThemeColors;
+}) {
+  const softBg = colors.background === Colors.dark.background && softDark ? softDark : soft;
+
+  return (
+    <ScalePressable onPress={onPress} disabled={loading} style={styles.actionTile}>
+      {loading ? (
+        <View style={styles.actionTileLoading}>
+          <ActivityIndicator color={accent} />
+        </View>
+      ) : gradient ? (
+        <LinearGradient
+          colors={AppGradients.brand}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.actionTileGradient}
+        >
+          <View style={[styles.actionTileIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <SymbolView name={icon} size={20} tintColor="#fff" weight="bold" />
+          </View>
+          <Text style={[styles.actionTileTitle, { color: '#fff' }]} numberOfLines={1}>
+            {title}
+          </Text>
+        </LinearGradient>
+      ) : (
+        <View style={[styles.actionTileInner, { backgroundColor: colors.surface }]}>
+          <View style={[styles.actionTileIcon, { backgroundColor: softBg }]}>
+            <SymbolView name={icon} size={20} tintColor={accent} />
+          </View>
+          <Text style={[styles.actionTileTitle, { color: colors.text }]} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+      )}
+    </ScalePressable>
+  );
+}
+
 function QuickAction({
   title,
   subtitle,
@@ -617,11 +777,7 @@ function QuickAction({
   const softBg = colors.background === Colors.dark.background && softDark ? softDark : soft;
 
   return (
-    <ScalePressable
-      onPress={onPress}
-      disabled={loading}
-      style={styles.quickAction}
-    >
+    <ScalePressable onPress={onPress} disabled={loading} style={styles.quickAction}>
       {loading ? (
         <View style={styles.quickLoading}>
           <ActivityIndicator color={accent} />
@@ -799,10 +955,56 @@ function EmptyDocumentsArt({
 }
 
 function createStyles(colors: ThemeColors) {
+  const isDark = colors.background === Colors.dark.background;
+
   return StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    headerHero: {
+      position: 'relative',
+      overflow: 'hidden',
+      flexGrow: 1,
+    },
+    tabletHeaderHero: {
+      position: 'relative',
+      overflow: 'hidden',
+      marginHorizontal: -24,
+      marginTop: -12,
+      paddingHorizontal: 24,
+      paddingBottom: 18,
+      gap: 14,
+      marginBottom: 2,
+    },
+    tabletTopBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      flexWrap: 'wrap',
+    },
+    tabletHeaderMeta: {
+      flexShrink: 0,
+      gap: 2,
+      minWidth: 140,
+    },
+    tabletHeaderTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.3,
+    },
+    tabletHeaderCount: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    tabletHeaderSearch: {
+      flex: 1,
+      minWidth: 220,
+    },
+    headerGradientFill: {
+      ...StyleSheet.absoluteFill,
     },
     container: {
       flexGrow: 1,
@@ -811,6 +1013,17 @@ function createStyles(colors: ThemeColors) {
       paddingBottom: 20,
       gap: 8,
     },
+    containerPhone: {
+      flexGrow: 1,
+      paddingTop: 0,
+      paddingBottom: 0,
+      gap: 0,
+    },
+    phonePad: {
+      paddingHorizontal: 20,
+      paddingBottom: 36,
+      gap: 14,
+    },
     containerTablet: {
       width: '100%',
       maxWidth: 1040,
@@ -818,7 +1031,7 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: 24,
       paddingTop: 12,
       paddingBottom: 24,
-      gap: 18,
+      gap: 16,
     },
     tabletScreen: {
       flex: 1,
@@ -852,6 +1065,7 @@ function createStyles(colors: ThemeColors) {
     tabletDocsPanel: {
       width: '100%',
       alignSelf: 'flex-start',
+      backgroundColor: isDark ? colors.surface : colors.backgroundSoft,
     },
     tabletDocsScrollContent: {
       paddingBottom: 4,
@@ -867,12 +1081,24 @@ function createStyles(colors: ThemeColors) {
       gap: 8,
     },
     listHeaderTablet: {
-      flexDirection: 'row',
-      alignItems: 'center',
       gap: 10,
       paddingHorizontal: 2,
       paddingBottom: 2,
       flexShrink: 0,
+    },
+    listHeaderTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    searchEmptyIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryContainer,
+      marginBottom: 12,
     },
     topBar: {
       flexDirection: 'row',
@@ -880,41 +1106,19 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'space-between',
       gap: 12,
       flexShrink: 0,
-      marginBottom: 8,
-    },
-    brandBlock: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
     },
     brandMark: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
       ...AppDesign.cardShadow,
     },
-    brandText: {
-      flex: 1,
-      gap: 2,
-    },
-    brandName: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: colors.text,
-      letterSpacing: -0.2,
-    },
-    brandMeta: {
-      fontSize: 12,
-      fontWeight: '500',
-      color: colors.textMuted,
-    },
     iconButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surface,
@@ -922,18 +1126,90 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
       ...AppDesign.cardShadow,
     },
+    greeting: {
+      gap: 4,
+      paddingTop: 2,
+    },
+    greetingTitle: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.6,
+    },
+    greetingMeta: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    actionRail: {
+      marginHorizontal: -20,
+    },
+    actionRailContent: {
+      paddingHorizontal: 20,
+      gap: 10,
+    },
+    actionTile: {
+      width: 132,
+      borderRadius: AppDesign.radius.lg,
+      overflow: 'hidden',
+      ...AppDesign.cardShadow,
+    },
+    actionTileInner: {
+      minHeight: 108,
+      padding: 14,
+      gap: 14,
+      justifyContent: 'space-between',
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    actionTileGradient: {
+      minHeight: 108,
+      padding: 14,
+      gap: 14,
+      justifyContent: 'space-between',
+      borderRadius: AppDesign.radius.lg,
+    },
+    actionTileIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    actionTileTitle: {
+      fontSize: 15,
+      fontWeight: '800',
+      letterSpacing: -0.2,
+    },
+    actionTileLoading: {
+      minHeight: 108,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: AppDesign.radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+    },
+    docsSheet: {
+      marginTop: -20,
+      flexGrow: 1,
+      // Light: slightly tinted sheet so white cards stand out; dark: keep low surface.
+      backgroundColor: isDark ? colors.surfaceContainerLow : colors.backgroundSoft,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 28,
+      gap: 14,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      ...AppDesign.cardShadow,
+    },
     createShell: {
       borderRadius: AppDesign.radius.xl,
       overflow: 'hidden',
       ...AppDesign.shadow,
-    },
-    createGradient: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      minHeight: 80,
     },
     createGradientTablet: {
       gap: 10,
@@ -955,10 +1231,6 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       backgroundColor: 'rgba(255,255,255,0.18)',
     },
-    createTextWrap: {
-      flex: 1,
-      gap: 3,
-    },
     createTitle: {
       color: '#fff',
       fontSize: 17,
@@ -968,19 +1240,6 @@ function createStyles(colors: ThemeColors) {
       color: 'rgba(255,255,255,0.86)',
       fontSize: 12,
       lineHeight: 17,
-    },
-    toolsCard: {
-      backgroundColor: colors.backgroundSoft,
-      borderRadius: AppDesign.radius.xl,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: 'hidden',
-      ...AppDesign.cardShadow,
-    },
-    toolsDivider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: colors.border,
-      marginLeft: 68,
     },
     tabletToolsDivider: {
       height: StyleSheet.hairlineWidth,
@@ -1021,13 +1280,6 @@ function createStyles(colors: ThemeColors) {
       fontSize: 12,
       lineHeight: 16,
       color: colors.textSecondary,
-    },
-    listHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginTop: 3,
-      paddingHorizontal: 4,
     },
     listTitle: {
       flex: 1,
@@ -1086,7 +1338,7 @@ function createStyles(colors: ThemeColors) {
       color: colors.primary,
     },
     emptyState: {
-      marginVertical: 8,
+      marginVertical: 4,
       backgroundColor: colors.surface,
       borderRadius: AppDesign.radius.xl,
       borderWidth: 1,
@@ -1157,8 +1409,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden',
-      // No elevation/shadow here: Android paints a gray square when
-      // opacity is animated on views with elevation.
     },
     emptyTypeTitle: {
       fontSize: 14,

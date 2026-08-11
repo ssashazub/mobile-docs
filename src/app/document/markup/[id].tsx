@@ -19,6 +19,7 @@ import {
 import { LoadingState } from '@/components/ui/loading-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { showAppAlert } from '@/components/ui/app-alert';
+import { KeyboardAwareModalFrame } from '@/components/ui/keyboard-aware-modal-frame';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
@@ -382,7 +383,7 @@ export default function MarkupScreen() {
         ) : null}
 
         <Modal visible={fieldModal !== null} transparent animationType="fade">
-          <View style={styles.modalBackdrop}>
+          <KeyboardAwareModalFrame style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <ThemedText style={styles.modalTitle}>{t('import.fieldNameTitle')}</ThemedText>
               <TextInput
@@ -435,11 +436,11 @@ export default function MarkupScreen() {
                 />
               </View>
             </View>
-          </View>
+          </KeyboardAwareModalFrame>
         </Modal>
 
         <Modal visible={templateNameModal} transparent animationType="fade">
-          <View style={styles.modalBackdrop}>
+          <KeyboardAwareModalFrame style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <ThemedText style={styles.modalTitle}>{t('import.templateNameTitle')}</ThemedText>
               <TextInput
@@ -468,7 +469,7 @@ export default function MarkupScreen() {
                 />
               </View>
             </View>
-          </View>
+          </KeyboardAwareModalFrame>
         </Modal>
       </ThemedView>
     </GestureHandlerRootView>
@@ -606,7 +607,7 @@ function createStyles(colors: ThemeColors) {
     },
     modalCard: {
       borderRadius: AppDesign.radius.xl,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       padding: Spacing.four,
       gap: Spacing.two,
       ...AppDesign.shadow,

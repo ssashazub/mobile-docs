@@ -26,7 +26,7 @@ import { showAppAlert } from '@/components/ui/app-alert';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { LanguagePickerModal } from '@/components/ui/language-picker-modal';
 import { SettingsPickerModal } from '@/components/ui/settings-picker-modal';
-import { AppDesign } from '@/constants/app-design';
+import { AppDesign, AppGradients } from '@/constants/app-design';
 import { APP_FEEDBACK_EMAIL } from '@/constants/app-info';
 import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useAppSettings } from '@/contexts/app-settings-context';
@@ -278,7 +278,7 @@ export default function SettingsScreen() {
       >
         <View style={styles.hero}>
           <LinearGradient
-            colors={['#6366f1', '#4f46e5', '#4338ca']}
+            colors={AppGradients.brand}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.heroBadge}

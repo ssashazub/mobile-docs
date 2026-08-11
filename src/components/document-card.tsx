@@ -6,10 +6,11 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { SymbolView } from 'expo-symbols';
 
-import { TemplateIconBadge } from '@/components/template-icon-view';
+import { TemplateIconView } from '@/components/template-icon-view';
 import { AppDesign } from '@/constants/app-design';
-import { type ThemeColors } from '@/constants/theme';
+import { Colors, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { getDocumentDisplayInfo } from '@/lib/document-display';
@@ -59,24 +60,25 @@ export function DocumentCard({
       delayLongPress={380}
     >
       <Animated.View style={[styles.card, animatedStyle]}>
-        <View style={[styles.accent, { backgroundColor: display.accentColor }]} />
+        <View style={[styles.iconAvatar, { backgroundColor: `${display.accentColor}1f` }]}>
+          <TemplateIconView icon={display.icon} size={22} color={display.accentColor} />
+        </View>
 
         <View style={styles.body}>
           <View style={styles.topRow}>
-            <View style={[styles.badge, { backgroundColor: `${display.accentColor}18` }]}>
-              <TemplateIconBadge
-                icon={display.icon}
-                title={display.title}
-                size={12}
-                color={display.accentColor}
+            <Text style={[styles.badgeText, { color: display.accentColor }]} numberOfLines={1}>
+              {display.title}
+            </Text>
+            <View style={styles.dateChip}>
+              <SymbolView
+                name={{ ios: 'clock', android: 'schedule', web: 'schedule' }}
+                size={11}
+                tintColor={colors.textMuted}
               />
-              <Text style={[styles.badgeText, { color: display.accentColor }]} numberOfLines={1}>
-                {display.title}
+              <Text style={styles.date}>
+                {new Date(document.createdAt).toLocaleDateString(dateLocale)}
               </Text>
             </View>
-            <Text style={styles.date}>
-              {new Date(document.createdAt).toLocaleDateString(dateLocale)}
-            </Text>
           </View>
 
           <Text style={styles.title} numberOfLines={compact ? 1 : 2}>
@@ -90,7 +92,14 @@ export function DocumentCard({
               {document.description}
             </Text>
           ) : null}
-          <Text style={styles.hint}>{t('home.longPressHint')}</Text>
+        </View>
+
+        <View style={styles.chevronWrap}>
+          <SymbolView
+            name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }}
+            size={16}
+            tintColor={colors.textMuted}
+          />
         </View>
       </Animated.View>
     </Pressable>
@@ -98,25 +107,34 @@ export function DocumentCard({
 }
 
 function createStyles(colors: ThemeColors, compact: boolean) {
+  const isDark = colors.background === Colors.dark.background;
+
   return StyleSheet.create({
     card: {
       width: '100%',
       flexDirection: 'row',
-      backgroundColor: colors.surface,
+      alignItems: 'center',
+      backgroundColor: isDark ? colors.surfaceContainer : colors.surface,
       borderRadius: AppDesign.radius.lg,
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
+      paddingVertical: compact ? 10 : 12,
+      paddingHorizontal: 12,
+      gap: 12,
       ...AppDesign.cardShadow,
     },
-    accent: {
-      width: 5,
+    iconAvatar: {
+      width: compact ? 46 : 52,
+      height: compact ? 46 : 52,
+      borderRadius: AppDesign.radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
     },
     body: {
       flex: 1,
-      paddingVertical: compact ? 10 : 11,
-      paddingHorizontal: 14,
-      gap: 4,
+      gap: 3,
       minWidth: 0,
     },
     topRow: {
@@ -125,21 +143,17 @@ function createStyles(colors: ThemeColors, compact: boolean) {
       justifyContent: 'space-between',
       gap: 8,
     },
-    badge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      maxWidth: '72%',
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-    },
     badgeText: {
       flexShrink: 1,
       fontSize: 11,
       fontWeight: '800',
-      letterSpacing: 0.2,
+      letterSpacing: 0.3,
       textTransform: 'uppercase',
+    },
+    dateChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
     },
     date: {
       fontSize: 11,
@@ -147,13 +161,13 @@ function createStyles(colors: ThemeColors, compact: boolean) {
       fontWeight: '600',
     },
     title: {
-      fontSize: compact ? 17 : 18,
+      fontSize: compact ? 16 : 17,
       fontWeight: '800',
       color: colors.text,
-      lineHeight: compact ? 21 : 24,
+      lineHeight: compact ? 20 : 22,
     },
     meta: {
-      fontSize: compact ? 13 : 14,
+      fontSize: compact ? 12.5 : 13.5,
       color: colors.textSecondary,
       fontWeight: '500',
     },
@@ -162,11 +176,14 @@ function createStyles(colors: ThemeColors, compact: boolean) {
       lineHeight: compact ? 15 : 17,
       color: colors.textMuted,
     },
-    hint: {
-      marginTop: 1,
-      fontSize: 10,
-      color: colors.textMuted,
-      fontWeight: '500',
+    chevronWrap: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? colors.surfaceContainerHigh : colors.backgroundSoft,
+      flexShrink: 0,
     },
   });
 }

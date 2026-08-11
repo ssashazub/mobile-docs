@@ -31,6 +31,8 @@ export type TranslationSchema = {
     required: string;
     color: string;
     emoji: string;
+    undo: string;
+    redo: string;
   };
     home: {
         title: string;
@@ -42,6 +44,9 @@ export type TranslationSchema = {
     documentsMany: string;
     createDocument: string;
     createSubtitle: string;
+    actionCreate: string;
+    actionImport: string;
+    actionTemplates: string;
     templatesTitle: string;
     templatesSubtitle: string;
     emptyTitle: string;
@@ -51,6 +56,9 @@ export type TranslationSchema = {
     importPdf: string;
     importPdfSubtitle: string;
     importingPdf: string;
+    searchPlaceholder: string;
+    searchEmptyTitle: string;
+    searchEmptyText: string;
   };
   import: {
     errorTitle: string;
@@ -96,6 +104,8 @@ export type TranslationSchema = {
     noDetectedFieldsText: string;
     addFieldManual: string;
     drawFieldHint: string;
+    overlayFont: string;
+    overlayFontHint: string;
   };
   create: {
     screenTitle: string;
@@ -227,6 +237,9 @@ export type TranslationSchema = {
     editTitle: string;
     editHint: string;
     templateNotFound: string;
+    searchFieldsPlaceholder: string;
+    searchFieldsEmptyTitle: string;
+    searchFieldsEmptyText: string;
   };
   pdf: {
     footer: string;

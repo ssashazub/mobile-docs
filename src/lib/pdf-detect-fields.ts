@@ -1,5 +1,7 @@
 import { createFieldName } from '@/lib/pdf-overlay-state';
 import { inferPdfFormFieldInputKind } from '@/lib/field-validation';
+import { looksLikeNumericValue, capOverlayFontSize } from '@/lib/overlay-text-format';
+import { normalizeOverlayFontId } from '@/constants/overlay-fonts';
 import type { DetectedPdfField } from '@/lib/pdfjs-rasterizer-html';
 import type { PdfFormField } from '@/types/document';
 
@@ -42,13 +44,20 @@ export function detectedFieldsToFormFields(
     const label = item.label.trim() || matched?.label || `Field ${index + 1}`;
     const name = matched?.name ?? createFieldName(label || `field_${rectKey(item)}`, names);
     names.push(name);
+    const sample = item.value?.trim() || matched?.sourceText || '';
+    const amountLike = looksLikeNumericValue(sample);
+    // Prefer freshly detected bold. Never sticky-OR: amount cells were often
+    // wrongly marked bold via shared row-code fonts.
+    const bold = amountLike ? false : item.bold === true;
 
     return {
       name,
       label,
       type: matched?.type ?? 'text',
       value: previousValues[name] ?? matched?.value ?? item.value ?? '',
-      inputKind: matched?.inputKind ?? inferPdfFormFieldInputKind(name, label),
+      inputKind:
+        matched?.inputKind ??
+        (amountLike ? 'number' : inferPdfFormFieldInputKind(name, label)),
       rect: {
         pageIndex: item.pageIndex,
         x: item.x,
@@ -59,15 +68,17 @@ export function detectedFieldsToFormFields(
       origin: 'detected' as const,
       sourceText: item.value?.trim() ? item.value : matched?.sourceText,
       fontSize: item.fontSize ?? matched?.fontSize,
-      // Prefer freshly detected bold; keep previous if the new pass omitted it.
-      bold: item.bold === true || matched?.bold === true,
-      align: item.align ?? matched?.align,
+      bold,
+      align: item.align ?? matched?.align ?? (amountLike ? 'right' : undefined),
+      fontFamily: normalizeOverlayFontId(
+        item.fontFamily ?? matched?.fontFamily ?? (amountLike ? 'arial' : 'times')
+      ),
     };
   }).map((field) => {
     if (!field.rect || field.fontSize == null) {
       return field;
     }
-    const capped = Math.min(field.fontSize, Math.max(5, field.rect.height * 0.62));
+    const capped = capOverlayFontSize(field.fontSize, field.rect.height);
     return capped === field.fontSize ? field : { ...field, fontSize: capped };
   });
 }

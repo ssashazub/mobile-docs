@@ -1,3 +1,4 @@
+import { DateFormField } from '@/components/date-form-field';
 import { FormField } from '@/components/ui/form-field';
 import {
   getInputPropsForKind,
@@ -38,6 +39,22 @@ export function ValidatedFormField({
     kind,
     multiline,
   });
+
+  if (resolvedKind === 'date') {
+    return (
+      <DateFormField
+        label={label}
+        value={value}
+        onChangeText={onChangeText}
+        required={required}
+        error={error}
+        shakeToken={shakeToken}
+        placeholder={typeof placeholder === 'string' ? placeholder : '07.06.2026'}
+        style={style}
+      />
+    );
+  }
+
   const kindProps = getInputPropsForKind(resolvedKind, multiline);
 
   return (

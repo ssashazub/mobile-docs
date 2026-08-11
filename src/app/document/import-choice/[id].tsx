@@ -280,7 +280,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: AppDesign.radius.xl,
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       ...AppDesign.cardShadow,
     },
     choiceCardPressed: {
@@ -318,7 +318,7 @@ function createStyles(colors: ThemeColors) {
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.backgroundSoft,
+      backgroundColor: colors.surfaceContainer,
     },
     preparing: {
       flexDirection: 'row',

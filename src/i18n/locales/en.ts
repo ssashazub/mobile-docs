@@ -31,6 +31,8 @@ export const en: TranslationSchema = {
         required: 'required',
         color: 'Color',
         emoji: 'Emoji',
+        undo: 'Undo',
+        redo: 'Redo',
     },
     home: {
         title: 'Your Documents',
@@ -42,6 +44,9 @@ export const en: TranslationSchema = {
         documentsMany: 'documents',
         createDocument: 'Create Document',
         createSubtitle: 'Choose a template and fill in the fields',
+        actionCreate: 'Create',
+        actionImport: 'Import',
+        actionTemplates: 'Templates',
         templatesTitle: 'Document Templates',
         templatesSubtitle: 'Edit fields · create a new template',
         emptyTitle: 'Nothing here yet',
@@ -52,6 +57,9 @@ export const en: TranslationSchema = {
         importPdf: 'Import PDF',
         importPdfSubtitle: 'Mobile Docs PDF, form PDF, or a flat PDF to fill visually',
         importingPdf: 'Reading PDF...',
+        searchPlaceholder: 'Search documents…',
+        searchEmptyTitle: 'Nothing found',
+        searchEmptyText: 'Try another title, client, or file name.',
     },
     import: {
         errorTitle: 'Import failed',
@@ -94,14 +102,16 @@ export const en: TranslationSchema = {
         templateNamePlaceholder: 'My PDF template',
         markupNeedFields: 'Add at least one field before finishing.',
         overlayPlaceholder: 'Text',
-        smartFillHint: 'Tap a highlighted area to fill it. Pinch to zoom.',
+        smartFillHint: 'Tap a highlighted area to fill it. Pinch or double-tap to zoom like a photo.',
         fieldDone: 'Done',
         fieldValuePlaceholder: 'Enter value',
         noDetectedFieldsTitle: 'No fields detected',
         noDetectedFieldsText:
             'We could not find fillable areas automatically. Create a template or draw a field yourself.',
         addFieldManual: 'Add field',
-        drawFieldHint: 'Draw a rectangle on the page to create a field. Pinch to zoom.',
+        drawFieldHint: 'Draw a rectangle on the page to create a field.',
+        overlayFont: 'Font',
+        overlayFontHint: 'Typeface for text filled on the document',
     },
     create: {
         screenTitle: 'Template',
@@ -240,6 +250,9 @@ export const en: TranslationSchema = {
         editHint:
             'Field names come from the template. To change them, open Templates.',
         templateNotFound: 'Template not found',
+        searchFieldsPlaceholder: 'Search fields…',
+        searchFieldsEmptyTitle: 'No fields found',
+        searchFieldsEmptyText: 'Try another field name or value.',
     },
     pdf: {
         footer: 'Document generated with Mobile Docs',

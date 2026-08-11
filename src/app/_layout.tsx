@@ -1,9 +1,12 @@
 import { useEffect, type ReactNode } from 'react';
-import { Dimensions, Platform } from 'react-native';
+import { Dimensions, Platform, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
+import * as SystemUI from 'expo-system-ui';
+import { NavigationBar } from 'expo-navigation-bar';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { AppAlertProvider } from '@/components/ui/app-alert';
 import { AppSettingsProvider, useAppSettings } from '@/contexts/app-settings-context';
@@ -54,9 +57,17 @@ function RootNavigator() {
     void applyDeviceOrientationLock(layout.isTablet);
   }, [layout.isTablet]);
 
+  useEffect(() => {
+    // Root/window chrome behind status & home-indicator areas — keep in sync with theme.
+    void SystemUI.setBackgroundColorAsync(colors.background);
+  }, [colors.background]);
+
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      {Platform.OS === 'android' ? (
+        <NavigationBar style={colorScheme === 'dark' ? 'dark' : 'light'} />
+      ) : null}
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
@@ -67,7 +78,7 @@ function RootNavigator() {
           orientation: layout.isTablet ? 'default' : 'portrait',
         }}
       >
-        <Stack.Screen name="index" options={{ title: t('home.title') }} />
+        <Stack.Screen name="index" options={{ title: t('home.title'), headerShown: false }} />
         <Stack.Screen name="create/index" options={{ title: t('create.screenTitle') }} />
         <Stack.Screen name="templates/index" options={{ title: t('templates.title') }} />
         <Stack.Screen name="pdf-styles/index" options={{ title: t('pdfStyle.manageTitle') }} />
@@ -78,7 +89,7 @@ function RootNavigator() {
         <Stack.Screen name="settings/terms" options={{ title: t('settings.terms') }} />
         <Stack.Screen name="explore" options={{ title: 'Explore' }} />
       </Stack>
-    </>
+    </View>
   );
 }
 
@@ -105,16 +116,18 @@ function AppBootstrap({ children }: { children: ReactNode }) {
 
 export default function RootLayout() {
   return (
-    <ThemePreferenceProvider>
-      <LocalePreferenceProvider>
-        <AppSettingsProvider>
-          <AppBootstrap>
-            <AppAlertProvider>
-              <RootNavigator />
-            </AppAlertProvider>
-          </AppBootstrap>
-        </AppSettingsProvider>
-      </LocalePreferenceProvider>
-    </ThemePreferenceProvider>
+    <KeyboardProvider statusBarTranslucent navigationBarTranslucent preserveEdgeToEdge>
+      <ThemePreferenceProvider>
+        <LocalePreferenceProvider>
+          <AppSettingsProvider>
+            <AppBootstrap>
+              <AppAlertProvider>
+                <RootNavigator />
+              </AppAlertProvider>
+            </AppBootstrap>
+          </AppSettingsProvider>
+        </LocalePreferenceProvider>
+      </ThemePreferenceProvider>
+    </KeyboardProvider>
   );
 }

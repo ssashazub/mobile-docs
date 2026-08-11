@@ -25,21 +25,49 @@ import { EditorOverflowMenu } from '@/components/ui/editor-overflow-menu';
 import { LoadingState } from '@/components/ui/loading-state';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { showAppAlert } from '@/components/ui/app-alert';
+import {
+  SettingsPickerModal,
+  type SettingsPickerOption,
+} from '@/components/ui/settings-picker-modal';
+import { KeyboardAwareModalFrame } from '@/components/ui/keyboard-aware-modal-frame';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AppDesign } from '@/constants/app-design';
+import {
+  DEFAULT_OVERLAY_FONT,
+  OVERLAY_FONT_OPTIONS,
+  normalizeOverlayFontId,
+  overlayFontLabel,
+  type PdfOverlayFontId,
+} from '@/constants/overlay-fonts';
 import { Spacing, type ThemeColors } from '@/constants/theme';
 import { useI18n } from '@/hooks/use-i18n';
+import { useOverlayFonts } from '@/hooks/use-overlay-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { isImportedFormDocument } from '@/lib/document-display';
 import { getDocuments, updateDocument } from '@/lib/document-storage';
 import { detectedFieldsToFormFields } from '@/lib/pdf-detect-fields';
 import { createFieldName } from '@/lib/pdf-overlay-state';
-import { pdfRectToUi } from '@/lib/pdf-coords';
+import { pdfRectToUi, pickPdfFieldAtPoint } from '@/lib/pdf-coords';
 import { inferPdfFormFieldInputKind } from '@/lib/field-validation';
+import {
+  formatOverlayDisplayValue,
+  looksLikeNumericValue,
+  numericValuesEqual,
+  resolveOverlayBold,
+  capOverlayFontSize,
+} from '@/lib/overlay-text-format';
 import { isCheckboxChecked } from '@/lib/pdf-form';
 import type { DetectedPdfField } from '@/lib/pdfjs-rasterizer-html';
 import type { Document, PdfFieldRect, PdfFormField } from '@/types/document';
+
+const HISTORY_LIMIT = 40;
+
+type HistorySnapshot = {
+  fields: Record<string, string>;
+  formFields: PdfFormField[];
+  overlayFontFamily: PdfOverlayFontId;
+};
 
 function parseDocumentId(id: string | string[] | undefined): number | null {
   const rawId = Array.isArray(id) ? id[0] : id;
@@ -63,18 +91,45 @@ function fieldOverlayState(
 
   const trimmed = value.trim();
   const source = field.sourceText?.trim() ?? '';
+  const display = formatOverlayDisplayValue(trimmed, {
+    align: field.align,
+    sourceText: source,
+  });
 
   // Unchanged PDF text — let the raster show through.
-  if (source && trimmed === source) {
+  if (source && (trimmed === source || numericValuesEqual(trimmed, source))) {
     return { text: '', cover: false };
   }
 
-  // Cleared or replaced — cover the original glyphs (empty = erase).
-  if (source && trimmed !== source) {
-    return { text: trimmed, cover: true };
+  // Cleared printed content — keep a white cover so glyphs disappear.
+  if (source && !trimmed) {
+    return { text: '', cover: true };
   }
 
-  return { text: trimmed, cover: trimmed.length > 0 };
+  // Replaced printed content — cover original glyphs and draw the new value.
+  if (source && trimmed !== source && !numericValuesEqual(trimmed, source)) {
+    return { text: display, cover: true };
+  }
+
+  // New value in an empty cell — draw text without a white "sticker" patch.
+  return { text: display, cover: false };
+}
+
+function snapshotFromDocument(doc: Document): HistorySnapshot {
+  return {
+    fields: { ...doc.fields },
+    formFields: (doc.formFields ?? []).map((field) => ({ ...field })),
+    overlayFontFamily: normalizeOverlayFontId(doc.overlayFontFamily ?? DEFAULT_OVERLAY_FONT),
+  };
+}
+
+function applySnapshot(doc: Document, snapshot: HistorySnapshot): Document {
+  return {
+    ...doc,
+    fields: { ...snapshot.fields },
+    formFields: snapshot.formFields.map((field) => ({ ...field })),
+    overlayFontFamily: snapshot.overlayFontFamily,
+  };
 }
 
 export default function FillOnPageScreen() {
@@ -84,6 +139,7 @@ export default function FillOnPageScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const documentId = parseDocumentId(id);
+  useOverlayFonts();
 
   const [document, setDocument] = useState<Document | null>(null);
   const [draft, setDraft] = useState<Document | null>(null);
@@ -91,6 +147,7 @@ export default function FillOnPageScreen() {
   const [contentWidth, setContentWidth] = useState(0);
   const [activeFieldName, setActiveFieldName] = useState<string | null>(null);
   const [sheetValue, setSheetValue] = useState('');
+  const activeFieldNameRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [rasterizing, setRasterizing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,7 +155,13 @@ export default function FillOnPageScreen() {
   const [drawMode, setDrawMode] = useState(false);
   const [pendingRect, setPendingRect] = useState<PdfFieldRect | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [fontPickerOpen, setFontPickerOpen] = useState(false);
+  const [past, setPast] = useState<HistorySnapshot[]>([]);
+  const [future, setFuture] = useState<HistorySnapshot[]>([]);
   const promptedNoFieldsRef = useRef(false);
+  const draftRef = useRef<Document | null>(null);
+
+  draftRef.current = draft;
 
   useFocusEffect(
     useCallback(() => {
@@ -126,8 +189,16 @@ export default function FillOnPageScreen() {
             setDocument(null);
             setDraft(null);
           } else {
-            setDocument(found);
-            setDraft(found);
+            const withFont: Document = {
+              ...found,
+              overlayFontFamily: normalizeOverlayFontId(
+                found.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
+              ),
+            };
+            setDocument(withFont);
+            setDraft(withFont);
+            setPast([]);
+            setFuture([]);
             setNotFound(false);
             setPages([]);
             setRasterizing(true);
@@ -146,8 +217,65 @@ export default function FillOnPageScreen() {
     }, [documentId])
   );
 
+  const pushHistory = useCallback(() => {
+    const current = draftRef.current;
+    if (!current) {
+      return;
+    }
+    const snap = snapshotFromDocument(current);
+    setPast((prev) => {
+      const next = [...prev, snap];
+      return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
+    });
+    setFuture([]);
+  }, []);
+
+  const undo = useCallback(() => {
+    const current = draftRef.current;
+    if (!current || past.length === 0) {
+      return;
+    }
+    const previous = past[past.length - 1];
+    setPast((prev) => prev.slice(0, -1));
+    setFuture((prev) => [snapshotFromDocument(current), ...prev].slice(0, HISTORY_LIMIT));
+    setDraft(applySnapshot(current, previous));
+    activeFieldNameRef.current = null;
+    setActiveFieldName(null);
+  }, [past]);
+
+  const redo = useCallback(() => {
+    const current = draftRef.current;
+    if (!current || future.length === 0) {
+      return;
+    }
+    const next = future[0];
+    setFuture((prev) => prev.slice(1));
+    setPast((prev) => {
+      const stacked = [...prev, snapshotFromDocument(current)];
+      return stacked.length > HISTORY_LIMIT
+        ? stacked.slice(stacked.length - HISTORY_LIMIT)
+        : stacked;
+    });
+    setDraft(applySnapshot(current, next));
+    activeFieldNameRef.current = null;
+    setActiveFieldName(null);
+  }, [future]);
+
   const activeField =
     draft?.formFields?.find((field) => field.name === activeFieldName) ?? null;
+
+  const overlayFont = normalizeOverlayFontId(
+    draft?.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
+  );
+
+  const fontOptions: SettingsPickerOption<PdfOverlayFontId>[] = useMemo(
+    () =>
+      OVERLAY_FONT_OPTIONS.map((option) => ({
+        value: option.id,
+        title: option.label,
+      })),
+    []
+  );
 
   const openField = (field: PdfFormField) => {
     if (drawMode) {
@@ -155,6 +283,7 @@ export default function FillOnPageScreen() {
     }
 
     if (field.type === 'checkbox') {
+      pushHistory();
       setDraft((current) => {
         if (!current) {
           return current;
@@ -173,28 +302,80 @@ export default function FillOnPageScreen() {
     }
 
     setActiveFieldName(field.name);
+    activeFieldNameRef.current = field.name;
     setSheetValue(draft?.fields[field.name] ?? field.value ?? '');
   };
 
   const confirmField = (value: string) => {
-    if (!activeFieldName) {
+    const fieldName = activeFieldNameRef.current ?? activeFieldName;
+    if (!fieldName) {
       return;
     }
 
+    const current = draftRef.current;
+    const activeField = current?.formFields?.find((field) => field.name === fieldName);
+    const nextValue =
+      activeField?.type === 'checkbox'
+        ? value
+        : formatOverlayDisplayValue(value, {
+            align: activeField?.align,
+            sourceText: activeField?.sourceText,
+          });
+    const previousValue = current?.fields[fieldName] ?? '';
+    if (previousValue !== nextValue) {
+      pushHistory();
+    }
+
+    setDraft((doc) => {
+      if (!doc) {
+        return doc;
+      }
+      return {
+        ...doc,
+        fields: { ...doc.fields, [fieldName]: nextValue },
+        formFields: doc.formFields?.map((field) =>
+          field.name === fieldName
+            ? {
+                ...field,
+                value: nextValue,
+                bold: resolveOverlayBold(field, nextValue),
+                fontFamily: normalizeOverlayFontId(
+                  field.fontFamily ??
+                    (looksLikeNumericValue(nextValue) ||
+                    looksLikeNumericValue(field.sourceText ?? '')
+                      ? 'arial'
+                      : doc.overlayFontFamily ?? DEFAULT_OVERLAY_FONT)
+                ),
+              }
+            : field
+        ),
+      };
+    });
+    setSheetValue(nextValue);
+    activeFieldNameRef.current = null;
+    setActiveFieldName(null);
+  };
+
+  const setOverlayFont = (fontId: PdfOverlayFontId) => {
+    if (fontId === overlayFont) {
+      setFontPickerOpen(false);
+      return;
+    }
+    pushHistory();
     setDraft((current) => {
       if (!current) {
         return current;
       }
       return {
         ...current,
-        fields: { ...current.fields, [activeFieldName]: value },
-        formFields: current.formFields?.map((field) =>
-          field.name === activeFieldName ? { ...field, value } : field
-        ),
+        overlayFontFamily: fontId,
+        formFields: current.formFields?.map((field) => ({
+          ...field,
+          fontFamily: fontId,
+        })),
       };
     });
-    setSheetValue(value);
-    setActiveFieldName(null);
+    setFontPickerOpen(false);
   };
 
   const addManualField = () => {
@@ -202,6 +383,7 @@ export default function FillOnPageScreen() {
       return;
     }
 
+    pushHistory();
     const label = newFieldLabel.trim() || t('common.newField');
     const existingNames = (draft.formFields ?? []).map((field) => field.name);
     const name = createFieldName(label, existingNames);
@@ -213,6 +395,7 @@ export default function FillOnPageScreen() {
       inputKind: inferPdfFormFieldInputKind(name, label),
       rect: pendingRect,
       origin: 'custom',
+      fontFamily: overlayFont,
     };
 
     const nextDocument: Document = {
@@ -265,7 +448,10 @@ export default function FillOnPageScreen() {
           detected,
           current.formFields ?? [],
           current.fields
-        );
+        ).map((field) => ({
+          ...field,
+          fontFamily: field.fontFamily ?? current.overlayFontFamily ?? DEFAULT_OVERLAY_FONT,
+        }));
         const formFields = [...preserved, ...autoFields];
         const fields = {
           ...current.fields,
@@ -278,6 +464,9 @@ export default function FillOnPageScreen() {
           ...current,
           formFields,
           fields,
+          overlayFontFamily: normalizeOverlayFontId(
+            current.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
+          ),
         };
         shouldPrompt = detected.length === 0 && !formFields.some((field) => field.rect);
         return nextDocument;
@@ -305,9 +494,13 @@ export default function FillOnPageScreen() {
     try {
       const synced: Document = {
         ...draft,
+        overlayFontFamily: normalizeOverlayFontId(
+          draft.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
+        ),
         formFields: draft.formFields?.map((field) => ({
           ...field,
           value: draft.fields[field.name] ?? field.value,
+          fontFamily: field.fontFamily ?? draft.overlayFontFamily ?? DEFAULT_OVERLAY_FONT,
         })),
       };
 
@@ -344,6 +537,8 @@ export default function FillOnPageScreen() {
   }
 
   const fieldsWithRect = (draft.formFields ?? []).filter((field) => field.rect);
+  const canUndo = past.length > 0;
+  const canRedo = future.length > 0;
 
   return (
     <GestureHandlerRootView style={styles.flex}>
@@ -404,43 +599,147 @@ export default function FillOnPageScreen() {
             style={styles.flex}
             onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
           >
-            <ThemedText style={styles.hint}>
-              {drawMode ? t('import.drawFieldHint') : t('import.smartFillHint')}
-            </ThemedText>
+            {drawMode ? (
+              <ThemedText style={styles.hint}>{t('import.drawFieldHint')}</ThemedText>
+            ) : null}
+
+            <View style={styles.toolbar}>
+              <View style={styles.historyGroup}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.undo')}
+                  disabled={!canUndo}
+                  onPress={undo}
+                  style={({ pressed }) => [
+                    styles.toolButton,
+                    !canUndo && styles.toolButtonDisabled,
+                    pressed && canUndo && styles.pressed,
+                  ]}
+                >
+                  <SymbolView
+                    name={{
+                      ios: 'arrow.uturn.backward',
+                      android: 'undo',
+                      web: 'undo',
+                    }}
+                    size={18}
+                    tintColor={canUndo ? colors.text : colors.textMuted}
+                    weight="semibold"
+                  />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.redo')}
+                  disabled={!canRedo}
+                  onPress={redo}
+                  style={({ pressed }) => [
+                    styles.toolButton,
+                    !canRedo && styles.toolButtonDisabled,
+                    pressed && canRedo && styles.pressed,
+                  ]}
+                >
+                  <SymbolView
+                    name={{
+                      ios: 'arrow.uturn.forward',
+                      android: 'redo',
+                      web: 'redo',
+                    }}
+                    size={18}
+                    tintColor={canRedo ? colors.text : colors.textMuted}
+                    weight="semibold"
+                  />
+                </Pressable>
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('import.overlayFont')}
+                onPress={() => setFontPickerOpen(true)}
+                style={({ pressed }) => [styles.fontButton, pressed && styles.pressed]}
+              >
+                <SymbolView
+                  name={{
+                    ios: 'textformat',
+                    android: 'format_size',
+                    web: 'format_size',
+                  }}
+                  size={16}
+                  tintColor={colors.primary}
+                  weight="semibold"
+                />
+                <ThemedText style={styles.fontButtonText} numberOfLines={1}>
+                  {overlayFontLabel(overlayFont)}
+                </ThemedText>
+              </Pressable>
+            </View>
+
             <PdfPageCanvas
               pages={pages}
               contentWidth={Math.max(200, contentWidth)}
               pageGap={10}
               enablePinchZoom
-              renderOverlays={(layout) =>
-                fieldsWithRect
-                  .filter((field) => field.rect?.pageIndex === layout.pageIndex)
-                  .map((field) => {
-                    const overlay = fieldOverlayState(
-                      field,
-                      draft.fields[field.name] ?? field.value ?? ''
-                    );
-                    return (
-                      <PdfFieldHighlight
-                        key={field.name}
-                        rect={pdfRectToUi(field.rect!, layout.heightPt, layout.scale)}
-                        fontSizePt={Math.min(
-                          field.fontSize ??
-                            Math.min(8, Math.max(5.5, (field.rect?.height ?? 10) * 0.5)),
-                          Math.max(5, (field.rect?.height ?? 10) * 0.58)
-                        )}
-                        scale={layout.scale}
-                        align={field.align ?? 'left'}
-                        bold={field.bold}
-                        label={field.label}
-                        value={overlay.text}
-                        selected={activeFieldName === field.name}
-                        filled={overlay.cover}
-                        onPress={() => openField(field)}
+              renderOverlays={(layout) => {
+                const pageFields = fieldsWithRect.filter(
+                  (field) => field.rect?.pageIndex === layout.pageIndex
+                );
+
+                return (
+                  <>
+                    {pageFields.map((field) => {
+                      const overlay = fieldOverlayState(
+                        field,
+                        draft.fields[field.name] ?? field.value ?? ''
+                      );
+                      return (
+                        <PdfFieldHighlight
+                          key={field.name}
+                          rect={pdfRectToUi(field.rect!, layout.heightPt, layout.scale)}
+                          fontSizePt={capOverlayFontSize(
+                            field.fontSize ??
+                              Math.max(7, (field.rect?.height ?? 10) * 0.75),
+                            field.rect?.height ?? 10
+                          )}
+                          scale={layout.scale}
+                          align={field.align ?? 'left'}
+                          bold={resolveOverlayBold(field, overlay.text || field.sourceText || '')}
+                          fontFamily={normalizeOverlayFontId(
+                            field.fontFamily ??
+                              (looksLikeNumericValue(overlay.text) ||
+                              looksLikeNumericValue(field.sourceText ?? '')
+                                ? 'arial'
+                                : overlayFont)
+                          )}
+                          label={field.label}
+                          value={overlay.text}
+                          sourceText={field.sourceText}
+                          selected={activeFieldName === field.name}
+                          filled={overlay.cover}
+                          interactive={false}
+                        />
+                      );
+                    })}
+                    {!drawMode ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={StyleSheet.absoluteFill}
+                        onPress={(event) => {
+                          const { locationX, locationY } = event.nativeEvent;
+                          const hit = pickPdfFieldAtPoint(
+                            pageFields,
+                            layout.heightPt,
+                            layout.scale,
+                            locationX,
+                            locationY
+                          );
+                          if (hit) {
+                            openField(hit);
+                          }
+                        }}
                       />
-                    );
-                  })
-              }
+                    ) : null}
+                  </>
+                );
+              }}
               renderInteractionLayer={
                 drawMode
                   ? (layout) => (
@@ -471,9 +770,11 @@ export default function FillOnPageScreen() {
                   // Persist detected/edited fields before switching to the list editor.
                   await updateDocument({
                     ...draft,
+                    overlayFontFamily: overlayFont,
                     formFields: draft.formFields?.map((field) => ({
                       ...field,
                       value: draft.fields[field.name] ?? field.value,
+                      fontFamily: field.fontFamily ?? overlayFont,
                     })),
                   });
                   router.replace(`/document/edit/${draft.id}` as Href);
@@ -490,12 +791,28 @@ export default function FillOnPageScreen() {
           visible={activeFieldName !== null && activeField !== null && !drawMode}
           field={activeField}
           value={sheetValue}
+          fontFamily={normalizeOverlayFontId(
+            activeField?.fontFamily ?? overlayFont
+          )}
           onConfirm={confirmField}
-          onCancel={() => setActiveFieldName(null)}
+          onCancel={() => {
+            activeFieldNameRef.current = null;
+            setActiveFieldName(null);
+          }}
+        />
+
+        <SettingsPickerModal
+          visible={fontPickerOpen}
+          title={t('import.overlayFont')}
+          subtitle={t('import.overlayFontHint')}
+          selected={overlayFont}
+          options={fontOptions}
+          onSelect={setOverlayFont}
+          onClose={() => setFontPickerOpen(false)}
         />
 
         <Modal visible={pendingRect !== null} transparent animationType="fade">
-          <View style={styles.modalBackdrop}>
+          <KeyboardAwareModalFrame style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <ThemedText style={styles.modalTitle}>{t('import.fieldNameTitle')}</ThemedText>
               <TextInput
@@ -523,7 +840,7 @@ export default function FillOnPageScreen() {
                 />
               </View>
             </View>
-          </View>
+          </KeyboardAwareModalFrame>
         </Modal>
 
         {rasterizing ? (
@@ -564,7 +881,51 @@ function createStyles(colors: ThemeColors) {
       fontSize: 13,
       paddingHorizontal: Spacing.four,
       paddingTop: Spacing.two,
+      paddingBottom: Spacing.one,
+    },
+    toolbar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.three,
       paddingBottom: Spacing.two,
+      gap: 10,
+    },
+    historyGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    toolButton: {
+      width: 40,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.backgroundSoft,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    toolButtonDisabled: {
+      opacity: 0.45,
+    },
+    fontButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 36,
+      maxWidth: '62%',
+      paddingHorizontal: 12,
+      borderRadius: 18,
+      backgroundColor: colors.backgroundSoft,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    fontButtonText: {
+      color: colors.primary,
+      fontWeight: '700',
+      fontSize: 13,
+      flexShrink: 1,
     },
     headerActions: {
       flexDirection: 'row',
@@ -623,7 +984,7 @@ function createStyles(colors: ThemeColors) {
     },
     modalCard: {
       borderRadius: AppDesign.radius.xl,
-      backgroundColor: colors.surface,
+      backgroundColor: colors.surfaceContainerLow,
       padding: Spacing.four,
       gap: Spacing.two,
       ...AppDesign.shadow,
