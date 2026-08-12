@@ -131,6 +131,14 @@ export function extractFormFields(pdfDoc: PDFDocument): PdfFormField[] {
       options,
       rect: readFieldRect(field, pdfDoc),
       origin: 'acroform' as const,
+      // Track the PDF's own stored value as the "pristine" baseline — same as
+      // detected fields. Without this, any AcroForm field that already has a
+      // value (even one meant for machine/DB use, not for display — e.g. a
+      // transliterated duplicate of a printed name) gets redrawn as an
+      // overlay on every open, doubling up with the correct printed text.
+      // Only once the user actually changes the value away from this
+      // baseline should we cover the original and draw the new text.
+      sourceText: type === 'text' || type === 'other' ? value : undefined,
       inputKind:
         type === 'text' || type === 'other'
           ? inferPdfFormFieldInputKind(name, label)

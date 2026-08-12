@@ -2,7 +2,7 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 
 /** Bump when rasterizer HTML/JS wiring changes so devices pick up a fresh runtime. */
-const PDFJS_DIR = `${FileSystem.cacheDirectory}pdfjs-runtime-v16/`;
+const PDFJS_DIR = `${FileSystem.cacheDirectory}pdfjs-runtime-v17/`;
 
 let scriptsPromise: Promise<void> | null = null;
 
@@ -735,6 +735,7 @@ function buildRasterizerHtml(): string {
           setStatus('loading pdf');
           var detected = [];
           opts = opts || {};
+          var detectFields = opts.detectFields !== false;
           // Target sharp display on modern phone DPI (small table text needs headroom).
           var cssWidth = Number(opts.cssWidth) || 390;
           var dpr = Number(opts.dpr) || 2;
@@ -751,7 +752,9 @@ function buildRasterizerHtml(): string {
 
               function next() {
                 if (index > total) {
-                  post({ type: 'detectedFields', fields: detected });
+                  if (detectFields) {
+                    post({ type: 'detectedFields', fields: detected });
+                  }
                   setStatus('done');
                   post({ type: 'done', total: total });
                   return;
@@ -797,6 +800,9 @@ function buildRasterizerHtml(): string {
                       }
                       canvas.width = 0;
                       canvas.height = 0;
+                      if (!detectFields) {
+                        return [];
+                      }
                       return detectFieldsOnPage(page, index - 1);
                     })
                     .then(function (pageFields) {

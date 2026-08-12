@@ -8,6 +8,7 @@ import * as SystemUI from 'expo-system-ui';
 import { NavigationBar } from 'expo-navigation-bar';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
+import { MupdfPdfProcessor } from '@/components/mupdf-pdf-processor';
 import { AppAlertProvider } from '@/components/ui/app-alert';
 import { AppSettingsProvider, useAppSettings } from '@/contexts/app-settings-context';
 import { LocalePreferenceProvider, useLocalePreference } from '@/contexts/locale-preference-context';
@@ -122,6 +123,7 @@ export default function RootLayout() {
           <AppSettingsProvider>
             <AppBootstrap>
               <AppAlertProvider>
+                <MupdfPdfProcessor />
                 <RootNavigator />
               </AppAlertProvider>
             </AppBootstrap>

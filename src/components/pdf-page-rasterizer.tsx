@@ -22,6 +22,8 @@ type PdfPageRasterizerProps = {
   onError: (message: string) => void;
   onPage?: (pages: RasterizedPage[], done: number, total: number) => void;
   onDetectedFields?: (fields: DetectedPdfField[]) => void;
+  /** When false, only rasterize pages (used after baking edits into a working PDF). */
+  detectFields?: boolean;
 };
 
 const RASTER_TIMEOUT_MS = 90000;
@@ -32,6 +34,7 @@ export function PdfPageRasterizer({
   onError,
   onPage,
   onDetectedFields,
+  detectFields = true,
 }: PdfPageRasterizerProps) {
   const webRef = useRef<WebView>(null);
   const pagesRef = useRef<RasterizedPage[]>([]);
@@ -39,6 +42,8 @@ export function PdfPageRasterizer({
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
   const runtimeDirRef = useRef<string | null>(null);
+  const detectFieldsRef = useRef(detectFields);
+  detectFieldsRef.current = detectFields;
 
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
@@ -59,8 +64,9 @@ export function PdfPageRasterizer({
     startedRef.current = true;
     const cssWidth = Math.round(Dimensions.get('window').width);
     const dpr = PixelRatio.get();
+    const detect = detectFieldsRef.current ? 'true' : 'false';
     webRef.current?.injectJavaScript(
-      `try { window.__startRaster__('./document.pdf', { cssWidth: ${cssWidth}, dpr: ${dpr} }); } catch (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: String(e && e.message ? e.message : e) })); } true;`
+      `try { window.__startRaster__('./document.pdf', { cssWidth: ${cssWidth}, dpr: ${dpr}, detectFields: ${detect} }); } catch (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: String(e && e.message ? e.message : e) })); } true;`
     );
   }, []);
 

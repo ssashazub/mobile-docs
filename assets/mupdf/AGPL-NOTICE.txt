@@ -1,0 +1,8 @@
+MuPDF.js (Artifex) is licensed under AGPL-3.0-or-later.
+
+Using these files in a closed-source App Store / Play Store app without an
+Artifex commercial license requires releasing your entire application under
+a compatible open-source license (AGPL obligations).
+
+Commercial licensing: https://artifex.com/contact/mupdf-js
+AGPL text: https://www.gnu.org/licenses/agpl-3.0.html

@@ -1,6 +1,6 @@
 import { createFieldName } from '@/lib/pdf-overlay-state';
 import { inferPdfFormFieldInputKind } from '@/lib/field-validation';
-import { looksLikeNumericValue, capOverlayFontSize } from '@/lib/overlay-text-format';
+import { looksLikeNumericValue, looksLikeRowCode, capOverlayFontSize } from '@/lib/overlay-text-format';
 import { normalizeOverlayFontId } from '@/constants/overlay-fonts';
 import type { DetectedPdfField } from '@/lib/pdfjs-rasterizer-html';
 import type { PdfFormField } from '@/types/document';
@@ -46,9 +46,11 @@ export function detectedFieldsToFormFields(
     names.push(name);
     const sample = item.value?.trim() || matched?.sourceText || '';
     const amountLike = looksLikeNumericValue(sample);
-    // Prefer freshly detected bold. Never sticky-OR: amount cells were often
-    // wrongly marked bold via shared row-code fonts.
-    const bold = amountLike ? false : item.bold === true;
+    // Only short row-code-shaped numbers were the real false-positive case
+    // (sharing a font id with bold headers). Genuine amounts — e.g. bold
+    // total/subtotal rows — should keep the font's real detected weight.
+    const rowCodeLike = amountLike && looksLikeRowCode(sample);
+    const bold = rowCodeLike ? false : item.bold === true;
 
     return {
       name,

@@ -6,7 +6,7 @@
  */
 
 /** Just enough to miss the black grid stroke (~0.5–1pt). */
-const BORDER_INSET_PT = 0.35;
+const BORDER_INSET_PT = 0.2;
 
 /** Cyrillic + Latin glyphs with descenders / long tails under the baseline. */
 const DESCENDER_RE = /[уУдДрРфФцЦщЩзЗgjpqyGJPQY]/;

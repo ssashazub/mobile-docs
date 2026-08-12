@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GestureHandlerRootView,
 } from 'react-native-gesture-handler';
@@ -12,6 +12,7 @@ import {
 import { Stack, type Href, useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system/legacy';
 
 import { PdfDrawFieldLayer } from '@/components/pdf-draw-field-layer';
 import { PdfFieldHighlight } from '@/components/pdf-field-highlight';
@@ -46,7 +47,9 @@ import { useOverlayFonts } from '@/hooks/use-overlay-fonts';
 import { useTheme } from '@/hooks/use-theme';
 import { isImportedFormDocument } from '@/lib/document-display';
 import { getDocuments, updateDocument } from '@/lib/document-storage';
+import { buildImportedFormPdfBytes } from '@/lib/export-pdf';
 import { detectedFieldsToFormFields } from '@/lib/pdf-detect-fields';
+import { writePdfBytes } from '@/lib/pdf-bytes';
 import { createFieldName } from '@/lib/pdf-overlay-state';
 import { pdfRectToUi, pickPdfFieldAtPoint } from '@/lib/pdf-coords';
 import { inferPdfFormFieldInputKind } from '@/lib/field-validation';
@@ -80,8 +83,14 @@ function parseDocumentId(id: string | string[] | undefined): number | null {
 
 function fieldOverlayState(
   field: PdfFormField,
-  value: string
+  value: string,
+  hideBurnedOverlays = false
 ): { text: string; cover: boolean } {
+  // Raster already matches Preview — only keep hit targets / selection chrome.
+  if (hideBurnedOverlays) {
+    return { text: '', cover: false };
+  }
+
   if (field.type === 'checkbox') {
     return {
       text: isCheckboxChecked(value) ? '✓' : '',
@@ -113,6 +122,20 @@ function fieldOverlayState(
 
   // New value in an empty cell — draw text without a white "sticker" patch.
   return { text: display, cover: false };
+}
+
+function documentNeedsBake(doc: Document): boolean {
+  for (const field of doc.formFields ?? []) {
+    if (field.origin === 'acroform') {
+      continue;
+    }
+    const value = doc.fields[field.name] ?? field.value ?? '';
+    const overlay = fieldOverlayState(field, value, false);
+    if (overlay.text || overlay.cover) {
+      return true;
+    }
+  }
+  return (doc.overlays ?? []).some((overlay) => overlay.text.trim().length > 0);
 }
 
 function snapshotFromDocument(doc: Document): HistorySnapshot {
@@ -158,10 +181,98 @@ export default function FillOnPageScreen() {
   const [fontPickerOpen, setFontPickerOpen] = useState(false);
   const [past, setPast] = useState<HistorySnapshot[]>([]);
   const [future, setFuture] = useState<HistorySnapshot[]>([]);
+  /** Working PDF baked like Preview — when set, page images match export. */
+  const [displayPdfUri, setDisplayPdfUri] = useState<string | null>(null);
+  const [rasterSynced, setRasterSynced] = useState(false);
+  const [allowDetection, setAllowDetection] = useState(true);
+  /** Re-bake in progress while old page images stay on screen. */
+  const [rasterRefreshing, setRasterRefreshing] = useState(false);
   const promptedNoFieldsRef = useRef(false);
   const draftRef = useRef<Document | null>(null);
+  const pendingRasterSyncRef = useRef(false);
+  const hasPagesRef = useRef(false);
 
   draftRef.current = draft;
+  hasPagesRef.current = pages.length > 0;
+
+  const bakeKey = useMemo(() => {
+    if (!draft) {
+      return '';
+    }
+    return JSON.stringify({
+      fields: draft.fields,
+      font: draft.overlayFontFamily,
+      overlays: (draft.overlays ?? []).map((item) => [
+        item.id,
+        item.text,
+        item.fontSize,
+        item.x,
+        item.y,
+      ]),
+    });
+  }, [draft]);
+
+  useEffect(() => {
+    if (!draft?.originalPdfUri) {
+      return;
+    }
+
+    if (!documentNeedsBake(draft)) {
+      if (displayPdfUri) {
+        pendingRasterSyncRef.current = false;
+        if (hasPagesRef.current) {
+          setRasterRefreshing(true);
+        }
+        setDisplayPdfUri(null);
+        setRasterSynced(false);
+        setRasterizing(true);
+      }
+      return;
+    }
+
+    // Hide the page stage immediately so overlay/bitmap swaps never flash.
+    if (hasPagesRef.current) {
+      setRasterRefreshing(true);
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const bytes = await buildImportedFormPdfBytes(draft);
+          if (cancelled || !FileSystem.cacheDirectory) {
+            if (!cancelled) {
+              setRasterRefreshing(false);
+            }
+            return;
+          }
+          const uri = `${FileSystem.cacheDirectory}fill-bake-${draft.id}.pdf`;
+          await writePdfBytes(uri, bytes);
+          if (cancelled) {
+            return;
+          }
+          pendingRasterSyncRef.current = true;
+          setDisplayPdfUri(uri);
+          setAllowDetection(false);
+          setRasterizing(true);
+        } catch (error) {
+          console.warn('[fill] preview bake failed', error);
+          if (!cancelled) {
+            pendingRasterSyncRef.current = false;
+            setRasterSynced(false);
+            setRasterRefreshing(false);
+          }
+        }
+      })();
+    }, 80);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // displayPdfUri intentionally omitted — only react to draft content changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bakeKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -201,6 +312,11 @@ export default function FillOnPageScreen() {
             setFuture([]);
             setNotFound(false);
             setPages([]);
+            setDisplayPdfUri(null);
+            setRasterSynced(false);
+            setRasterRefreshing(false);
+            pendingRasterSyncRef.current = false;
+            setAllowDetection(true);
             setRasterizing(true);
           }
         } finally {
@@ -284,6 +400,9 @@ export default function FillOnPageScreen() {
 
     if (field.type === 'checkbox') {
       pushHistory();
+      if (hasPagesRef.current) {
+        setRasterRefreshing(true);
+      }
       setDraft((current) => {
         if (!current) {
           return current;
@@ -324,6 +443,10 @@ export default function FillOnPageScreen() {
     const previousValue = current?.fields[fieldName] ?? '';
     if (previousValue !== nextValue) {
       pushHistory();
+      // Cover the stage before draft overlays / bake redraw can flash.
+      if (hasPagesRef.current) {
+        setRasterRefreshing(true);
+      }
     }
 
     setDraft((doc) => {
@@ -596,9 +719,15 @@ export default function FillOnPageScreen() {
           </View>
         ) : pages.length > 0 ? (
           <View
-            style={styles.flex}
+            style={styles.pageStage}
             onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
           >
+            {rasterRefreshing ? (
+              <View style={styles.refreshOverlay}>
+                <LoadingState label={t('import.rasterizing')} />
+              </View>
+            ) : (
+              <View style={styles.pageContent}>
             {drawMode ? (
               <ThemedText style={styles.hint}>{t('import.drawFieldHint')}</ThemedText>
             ) : null}
@@ -688,7 +817,8 @@ export default function FillOnPageScreen() {
                     {pageFields.map((field) => {
                       const overlay = fieldOverlayState(
                         field,
-                        draft.fields[field.name] ?? field.value ?? ''
+                        draft.fields[field.name] ?? field.value ?? '',
+                        rasterSynced
                       );
                       return (
                         <PdfFieldHighlight
@@ -755,6 +885,8 @@ export default function FillOnPageScreen() {
                   : undefined
               }
             />
+              </View>
+            )}
           </View>
         ) : (
           <View style={styles.centered}>
@@ -845,19 +977,32 @@ export default function FillOnPageScreen() {
 
         {rasterizing ? (
           <PdfPageRasterizer
-            pdfUri={document.originalPdfUri}
+            key={displayPdfUri ?? document.originalPdfUri}
+            pdfUri={displayPdfUri ?? document.originalPdfUri}
+            detectFields={allowDetection && !displayPdfUri}
             onPage={(nextPages) => {
-              setPages(nextPages);
+              // Initial load: stream pages in. Refresh: keep old images until complete.
+              if (!hasPagesRef.current) {
+                setPages(nextPages);
+              }
             }}
             onDetectedFields={(detected) => {
+              setAllowDetection(false);
               void handleDetectedFields(detected);
             }}
             onComplete={(nextPages) => {
+              // Update bitmaps while the opaque cover still hides the stage.
               setPages(nextPages);
               setRasterizing(false);
+              setRasterSynced(pendingRasterSyncRef.current);
+              // Let RN Image decode before revealing — avoids the post-apply blink.
+              setTimeout(() => {
+                setRasterRefreshing(false);
+              }, 280);
             }}
             onError={(message) => {
               setRasterizing(false);
+              setRasterRefreshing(false);
               showAppAlert(t('import.rasterError'), message);
             }}
           />
@@ -870,6 +1015,18 @@ export default function FillOnPageScreen() {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     flex: { flex: 1 },
+    pageStage: {
+      flex: 1,
+      position: 'relative',
+      backgroundColor: colors.background,
+    },
+    pageContent: { flex: 1 },
+    refreshOverlay: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
     centered: {
       flex: 1,
       alignItems: 'center',

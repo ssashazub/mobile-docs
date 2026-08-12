@@ -8,6 +8,8 @@ import { getAppSettings } from '@/lib/app-settings-storage';
 import { isAppTemplateDocument, isImportedFormDocument } from '@/lib/document-display';
 import { buildExportFileBaseName } from '@/lib/export-file-name';
 import { writeExportPdfBytes } from '@/lib/export-folder';
+import { redactPdfWithMupdf } from '@/lib/mupdf-bridge';
+import { collectMupdfRedactRects } from '@/lib/mupdf-redact-rects';
 import { applyFormFieldValues } from '@/lib/pdf-form';
 import { drawDocumentOverlays } from '@/lib/pdf-draw-overlays';
 import { buildExportMetadata, embedMetadataInPdfBytes } from '@/lib/pdf-metadata';
@@ -159,8 +161,32 @@ async function buildImportedFormPdf(document: Document): Promise<Uint8Array> {
     pdfBytes = await applyFormFieldValues(pdfBytes, document.fields);
   }
 
-  pdfBytes = await drawDocumentOverlays(pdfBytes, document);
+  const redactRects = collectMupdfRedactRects(document);
+
+  if (redactRects.length > 0) {
+    try {
+      console.log('[export] MuPDF redact start', redactRects.length, 'rects');
+      pdfBytes = await redactPdfWithMupdf(pdfBytes, redactRects);
+      console.log('[export] MuPDF redact ok');
+    } catch (error) {
+      console.warn('[export] MuPDF redact failed — whiteout only', error);
+    }
+  } else {
+    console.log('[export] MuPDF redact skipped — no changed sourceText fields');
+  }
+
+  // Always paint a cover when replacing glyphs. Even after a successful MuPDF
+  // pass this is a no-op on white paper, and it prevents "double text" if
+  // redaction missed a glyph run / scanned pixels.
+  pdfBytes = await drawDocumentOverlays(pdfBytes, document, {
+    skipWhiteout: false,
+  });
   return pdfBytes;
+}
+
+/** Same pipeline as Preview/export — used to bake the fill-on-page raster. */
+export async function buildImportedFormPdfBytes(document: Document): Promise<Uint8Array> {
+  return buildImportedFormPdf(document);
 }
 
 /** Prepare PDF for preview / print / share without opening the share sheet yet. */

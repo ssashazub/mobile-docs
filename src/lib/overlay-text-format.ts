@@ -60,7 +60,7 @@ export function formatGroupedNumber(value: string): string {
 }
 
 /** 3–4 digit integers are usually row codes ("Код рядка"), not amounts. */
-function looksLikeRowCode(value: string): boolean {
+export function looksLikeRowCode(value: string): boolean {
   const compact = stripNumberGrouping(value);
   return /^\d{3,4}$/.test(compact);
 }
@@ -145,8 +145,12 @@ export function capOverlayFontSize(fontSize: number, rectHeight: number): number
 }
 
 /**
- * Amount cells often share a PDF font id with bold row codes; never faux-bold
- * numeric values so overlays match regular body text.
+ * Amount cells sometimes share a PDF font id with bold row codes, which used
+ * to cause every numeric value to be forced non-bold. That over-corrected:
+ * bold total/subtotal rows in financial tables are common and legitimately
+ * bold in BOTH columns — suppressing it made the edited cell visibly lighter
+ * than its untouched neighbor. Only short row-code-shaped numbers (the actual
+ * false-positive case) get de-bolded now; real amounts keep the detected weight.
  * Long form values (enterprise names, addresses) are also regular weight.
  */
 export function resolveOverlayBold(
@@ -157,11 +161,11 @@ export function resolveOverlayBold(
     return false;
   }
   const sample = (value || field.sourceText || '').trim();
-  if (looksLikeNumericValue(sample)) {
+  if (looksLikeNumericValue(sample) && looksLikeRowCode(sample)) {
     return false;
   }
   // Body lines / titles — not short section headers.
-  if (sample.length > 24) {
+  if (!looksLikeNumericValue(sample) && sample.length > 24) {
     return false;
   }
   return true;

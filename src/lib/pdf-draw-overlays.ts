@@ -60,16 +60,25 @@ function whiteoutRect(
     return;
   }
 
-  // Full replace: hug the cell; enlarge slightly when source has descenders.
+  // Full replace: cover nearly the whole cell so soft/AA edges of old glyphs
+  // cannot peek out from behind the new digits (see double-print exports).
   const cover = coverPdfRectInsideCell(rect, {
     text: source,
     fontSizePt: fontSize ?? rect.height * 0.7,
+    insetPt: 0.12,
   });
+  // Extra grow for amount cells — old digits are often optically wider than the wipe.
+  const growX = Math.min(1.2, Math.max(0.35, rect.width * 0.02));
+  const growY = Math.min(0.9, Math.max(0.25, rect.height * 0.06));
+  const x = Math.max(rect.x + 0.08, cover.x - growX);
+  const y = Math.max(rect.y + 0.08, cover.y - growY);
+  const maxX = rect.x + rect.width - 0.08;
+  const maxY = rect.y + rect.height - 0.08;
   page.drawRectangle({
-    x: cover.x,
-    y: cover.y,
-    width: cover.width,
-    height: cover.height,
+    x,
+    y,
+    width: Math.max(1, Math.min(maxX, cover.x + cover.width + growX) - x),
+    height: Math.max(1, Math.min(maxY, cover.y + cover.height + growY) - y),
     color: rgb(1, 1, 1),
     borderWidth: 0,
   });
@@ -147,14 +156,24 @@ function drawTextInRect(
   }
 }
 
+export type DrawOverlaysOptions = {
+  /**
+   * When true, skip painting white rectangles over sourceText.
+   * Use after MuPDF content-stream redaction already removed original glyphs.
+   */
+  skipWhiteout?: boolean;
+};
+
 /**
  * Draw custom/overlay field values and free overlays onto a PDF.
  * Native AcroForm values should be applied separately via applyFormFieldValues.
  */
 export async function drawDocumentOverlays(
   pdfBytes: Uint8Array,
-  document: Document
+  document: Document,
+  options?: DrawOverlaysOptions
 ): Promise<Uint8Array> {
+  const skipWhiteout = options?.skipWhiteout === true;
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const defaultFontId = normalizeOverlayFontId(
     document.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
@@ -225,7 +244,7 @@ export async function drawDocumentOverlays(
     if (field.type === 'checkbox') {
       if (isCheckboxChecked(value)) {
         drawTextInRect(pdfDoc, font, rect, 'X', {
-          whiteout: Boolean(source),
+          whiteout: !skipWhiteout && Boolean(source),
           sourceText: source,
           fontSize: field.fontSize ?? rect.height * 0.7,
           align: 'center',
@@ -236,7 +255,8 @@ export async function drawDocumentOverlays(
 
     drawTextInRect(pdfDoc, font, rect, display, {
       // Only cover when replacing existing printed glyphs (dash / old value).
-      whiteout: Boolean(source) && !numericValuesEqual(trimmed, source),
+      whiteout:
+        !skipWhiteout && Boolean(source) && !numericValuesEqual(trimmed, source),
       sourceText: source,
       fontSize: field.fontSize,
       align: field.align ?? (amountLike ? 'right' : 'left'),
