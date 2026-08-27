@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { getDefaultTemplates } from '@/constants/default-templates';
+import { getBuiltinTemplates } from '@/core/templates/registry';
 import { getAppLocale } from '@/i18n';
 import { TEMPLATES_STORAGE_KEY } from '@/constants/storage';
 import { normalizeTemplate } from '@/lib/template-helpers';
@@ -33,7 +33,7 @@ export async function ensureTemplatesSeeded(): Promise<void> {
 }
 
 export async function getTemplates(): Promise<DocumentTemplate[]> {
-  const defaultTemplates = getDefaultTemplates(getAppLocale()).map(cloneTemplate);
+  const defaultTemplates = getBuiltinTemplates(getAppLocale()).map(cloneTemplate);
   const savedTemplates = await readSavedTemplates();
   const savedById = new Map(savedTemplates.map((template) => [template.id, template]));
 
@@ -100,7 +100,7 @@ export async function deleteTemplate(templateId: string): Promise<boolean> {
 }
 
 export async function resetTemplateToDefault(templateId: string): Promise<DocumentTemplate | null> {
-  const defaultTemplate = getDefaultTemplates(getAppLocale()).find((item) => item.id === templateId);
+  const defaultTemplate = getBuiltinTemplates(getAppLocale()).find((item) => item.id === templateId);
 
   if (!defaultTemplate) {
     return null;

@@ -22,15 +22,10 @@ export type TranslationSchema = {
     edit: string;
     open: string;
     create: string;
-    loading: string;
-    notFound: string;
     noClient: string;
     fields: string;
-    field: string;
     newField: string;
-    required: string;
     color: string;
-    emoji: string;
     undo: string;
     redo: string;
   };
@@ -51,25 +46,20 @@ export type TranslationSchema = {
     templatesSubtitle: string;
     emptyTitle: string;
     emptyText: string;
-    longPressHint: string;
     client: string;
     importPdf: string;
     importPdfSubtitle: string;
-    importingPdf: string;
     searchPlaceholder: string;
     searchEmptyTitle: string;
     searchEmptyText: string;
   };
   import: {
     errorTitle: string;
-    noFormFields: string;
     templateMissing: string;
     missingOriginalPdf: string;
     readFailed: string;
     formHint: string;
     detectedFieldsHint: string;
-    restoredHint: string;
-    flatTitle: string;
     flatMessage: string;
     choiceTitle: string;
     choiceSubtitle: string;
@@ -82,7 +72,6 @@ export type TranslationSchema = {
     fieldsUnavailableText: string;
     rasterizing: string;
     rasterError: string;
-    tapToAddText: string;
     markupTitle: string;
     markupHint: string;
     markupDone: string;
@@ -97,7 +86,6 @@ export type TranslationSchema = {
     templateNamePlaceholder: string;
     markupNeedFields: string;
     overlayPlaceholder: string;
-    smartFillHint: string;
     fieldDone: string;
     fieldValuePlaceholder: string;
     noDetectedFieldsTitle: string;
@@ -113,14 +101,11 @@ export type TranslationSchema = {
     chooseSubtitle: string;
     manageTemplates: string;
     manageSubtitle: string;
-    fillAndPdf: string;
     inputLanguageTitle: string;
     inputLanguageText: string;
     createDocument: string;
     templateNotFound: string;
-    loadingTemplate: string;
     fillRequired: string;
-    fillRequiredField: string;
     validationTitle: string;
     validationRequiredField: string;
     validationInvalidDate: string;
@@ -152,7 +137,6 @@ export type TranslationSchema = {
     baseTemplateTitle: string;
     baseTemplateSubtitle: string;
     blankTemplate: string;
-    defaultUkrainian: string;
     minOneField: string;
     allFieldsNeedLabel: string;
     enterTemplateName: string;
@@ -162,7 +146,6 @@ export type TranslationSchema = {
     modifyThisTemplate: string;
     newTemplateNameTitle: string;
     newTemplateNamePlaceholder: string;
-    unknownType: string;
     fieldLabel: string;
     placeholderLabel: string;
     placeholderHint: string;
@@ -221,12 +204,9 @@ export type TranslationSchema = {
     previewRetry: string;
     printPdf: string;
     printingPdf: string;
-    sharePdf: string;
-    sharingPdf: string;
     savePdf: string;
     savingPdf: string;
     more: string;
-    actions: string;
     chooseAction: string;
     saveToLibrary: string;
     rename: string;
@@ -236,7 +216,6 @@ export type TranslationSchema = {
     actionFailed: string;
     editTitle: string;
     editHint: string;
-    templateNotFound: string;
     searchFieldsPlaceholder: string;
     searchFieldsEmptyTitle: string;
     searchFieldsEmptyText: string;
@@ -249,12 +228,6 @@ export type TranslationSchema = {
     generateTimeout: string;
     sharingUnavailable: string;
     printFailed: string;
-  };
-  templateNames: {
-    contract: string;
-    invoice: string;
-    report: string;
-    act: string;
   };
   pdfStyle: {
     manage: string;
@@ -297,16 +270,13 @@ export type TranslationSchema = {
     fontMono: string;
   };
   theme: {
-    appearance: string;
     light: string;
     dark: string;
     system: string;
-    expandHint: string;
   };
   settings: {
     title: string;
     subtitle: string;
-    openHint: string;
     language: string;
     languageChoose: string;
     sectionGeneral: string;
@@ -321,25 +291,16 @@ export type TranslationSchema = {
     haptics: string;
     exportFolder: string;
     exportFolderApp: string;
-    exportFolderCustom: string;
     exportFolderChoose: string;
     exportFolderReset: string;
-    exportFolderHint: string;
     fileNameFormat: string;
     fileNameTitle: string;
     fileNameTitleDate: string;
     fileNameDateTitle: string;
     fileNameIdTitle: string;
     fileNameHint: string;
-    data: string;
     clearDocuments: string;
-    clearDocumentsConfirmTitle: string;
-    clearDocumentsConfirmText: string;
-    clearDocumentsDone: string;
     clearCache: string;
-    clearCacheConfirmTitle: string;
-    clearCacheConfirmText: string;
-    clearCacheDone: string;
     clearTemplates: string;
     storageCleanup: string;
     storageCleanupHint: string;

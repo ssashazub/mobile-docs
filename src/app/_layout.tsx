@@ -88,7 +88,6 @@ function RootNavigator() {
         <Stack.Screen name="settings/index" options={{ title: t('settings.title') }} />
         <Stack.Screen name="settings/privacy" options={{ title: t('settings.privacy') }} />
         <Stack.Screen name="settings/terms" options={{ title: t('settings.terms') }} />
-        <Stack.Screen name="explore" options={{ title: 'Explore' }} />
       </Stack>
     </View>
   );

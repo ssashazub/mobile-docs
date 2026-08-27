@@ -138,6 +138,5 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 /** @deprecated Prefer Layout.contentMaxWidth / useLayout(). */
 export const MaxContentWidth = 720;

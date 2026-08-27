@@ -1,7 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { PDFDocument } from 'pdf-lib';
 
-import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
 import { t } from '@/i18n';
 import { addDocument, getDocuments } from '@/lib/document-storage';
 import {
@@ -89,12 +88,4 @@ export async function pickAndImportPdf(): Promise<Document> {
 
   await addDocument(document);
   return document;
-}
-
-export function isRestoredAppPdf(document: Document): boolean {
-  return (
-    document.source === 'imported-form' &&
-    Boolean(document.templateId) &&
-    document.templateId !== IMPORTED_FORM_TEMPLATE_ID
-  );
 }

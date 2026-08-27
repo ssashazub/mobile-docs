@@ -14,7 +14,7 @@ import { applyFormFieldValues } from '@/lib/pdf-form';
 import { drawDocumentOverlays } from '@/lib/pdf-draw-overlays';
 import { buildExportMetadata, embedMetadataInPdfBytes } from '@/lib/pdf-metadata';
 import { base64ToUint8Array, readPdfBytes, uint8ArrayToBase64 } from '@/lib/pdf-bytes';
-import { renderDocumentPdfHtml } from '@/lib/pdf-templates';
+import { renderDocumentPdfHtml } from '@/core/pdf/render';
 import { getTemplateById } from '@/lib/template-storage';
 import type { Document } from '@/types/document';
 

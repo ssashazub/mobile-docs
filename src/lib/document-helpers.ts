@@ -1,7 +1,5 @@
 import { IMPORTED_FORM_TEMPLATE_ID } from '@/constants/imported-pdf';
 import { DEFAULT_OVERLAY_FONT, normalizeOverlayFontId } from '@/constants/overlay-fonts';
-import { t } from '@/i18n';
-import { getTemplateById } from '@/lib/template-storage';
 import { isCheckboxChecked } from '@/lib/pdf-form';
 import { normalizePdfStyle } from '@/lib/template-helpers';
 import type { Document, DocumentSource, PdfFormField } from '@/types/document';
@@ -162,9 +160,4 @@ export function buildDocumentFromPdfBackedTemplate(
       templateId: template.id,
     }
   );
-}
-
-export async function getDocumentTemplateLabel(templateId: string): Promise<string> {
-  const template = await getTemplateById(templateId);
-  return template?.title ?? t('document.title');
 }
