@@ -221,16 +221,6 @@ export default function HomeScreen() {
       style={styles.actionRail}
     >
       <ActionTile
-        title={t('home.actionCreate')}
-        icon={{ ios: 'plus', android: 'add', web: 'add' }}
-        accent="#fff"
-        soft={colors.primary}
-        gradient
-        onPress={() => router.push('/create' as Href)}
-        styles={styles}
-        colors={colors}
-      />
-      <ActionTile
         title={t('home.actionImport')}
         icon={{
           ios: 'square.and.arrow.down.fill',
@@ -242,6 +232,16 @@ export default function HomeScreen() {
         softDark="#134e4a"
         loading={importing}
         onPress={handleImportPdf}
+        styles={styles}
+        colors={colors}
+      />
+      <ActionTile
+        title={t('home.actionCreate')}
+        icon={{ ios: 'plus', android: 'add', web: 'add' }}
+        accent="#fff"
+        soft={colors.primary}
+        gradient
+        onPress={() => router.push('/create' as Href)}
         styles={styles}
         colors={colors}
       />
