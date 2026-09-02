@@ -12,6 +12,7 @@ import {
   numericValuesEqual,
   resolveOverlayBold,
   capOverlayFontSize,
+  shouldUseDashOnlyWipe,
 } from '@/lib/overlay-text-format';
 import { coverPdfRectInsideCell } from '@/lib/glyph-cover';
 import { isCheckboxChecked } from '@/lib/pdf-form';
@@ -34,11 +35,12 @@ function whiteoutRect(
   page: ReturnType<PDFDocument['getPages']>[number],
   rect: PdfFieldRect,
   source: string,
+  newText: string,
   align: PdfFormField['align'],
   fontSize?: number
 ): void {
-  const dash = /^[-–—−]$/.test(source.trim());
-  if (dash) {
+  const dashOnly = shouldUseDashOnlyWipe(source, newText);
+  if (dashOnly) {
     // Small wipe for dash only — stay inside the cell.
     const inner = coverPdfRectInsideCell(rect);
     const wipeW = Math.min(Math.max(10, rect.width * 0.28), inner.width);
@@ -111,7 +113,7 @@ function drawTextInRect(
   const align = options?.align ?? 'left';
 
   if (options?.whiteout) {
-    whiteoutRect(page, rect, options.sourceText ?? '', align, options.fontSize);
+    whiteoutRect(page, rect, options.sourceText ?? '', trimmed, align, options.fontSize);
   }
 
   if (!trimmed) {
@@ -144,8 +146,9 @@ function drawTextInRect(
     color,
   });
 
-  if (options?.bold) {
-    const stroke = Math.max(0.18, size * 0.028);
+  // Helvetica-Bold is embedded above; only fake-bold for Unicode serif/sans.
+  if (options?.bold && font.name !== 'Helvetica-Bold') {
+    const stroke = Math.max(0.12, size * 0.018);
     page.drawText(trimmed, {
       x: drawX + stroke,
       y: drawY,
@@ -178,16 +181,21 @@ export async function drawDocumentOverlays(
   const defaultFontId = normalizeOverlayFontId(
     document.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
   );
-  const fontCache = new Map<'sans' | 'serif' | 'helvetica', PDFFont>();
+  const fontCache = new Map<'sans' | 'serif' | 'helvetica' | 'helvetica-bold', PDFFont>();
 
-  const fontFor = async (id: PdfOverlayFontId | 'helvetica'): Promise<PDFFont> => {
-    if (id === 'helvetica') {
-      const cached = fontCache.get('helvetica');
+  const fontFor = async (
+    id: PdfOverlayFontId | 'helvetica' | 'helvetica-bold'
+  ): Promise<PDFFont> => {
+    if (id === 'helvetica' || id === 'helvetica-bold') {
+      const cacheKey = id;
+      const cached = fontCache.get(cacheKey);
       if (cached) {
         return cached;
       }
-      const embedded = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      fontCache.set('helvetica', embedded);
+      const embedded = await pdfDoc.embedFont(
+        id === 'helvetica-bold' ? StandardFonts.HelveticaBold : StandardFonts.Helvetica
+      );
+      fontCache.set(cacheKey, embedded);
       return embedded;
     }
 
@@ -233,13 +241,14 @@ export async function drawDocumentOverlays(
     }
 
     const amountLike = isLatinAmountText(display || source);
-    const font = amountLike
-      ? await fontFor('helvetica')
-      : await fontFor(
-          normalizeOverlayFontId(
-            field.fontFamily ?? document.overlayFontFamily ?? DEFAULT_OVERLAY_FONT
-          )
-        );
+    const fontId = normalizeOverlayFontId(
+      field.fontFamily ?? document.overlayFontFamily ?? (amountLike ? 'arial' : DEFAULT_OVERLAY_FONT)
+    );
+    const bold = resolveOverlayBold(field);
+    const font =
+      amountLike && fontId === 'arial'
+        ? await fontFor(bold ? 'helvetica-bold' : 'helvetica')
+        : await fontFor(fontId);
 
     if (field.type === 'checkbox') {
       if (isCheckboxChecked(value)) {
@@ -260,7 +269,7 @@ export async function drawDocumentOverlays(
       sourceText: source,
       fontSize: field.fontSize,
       align: field.align ?? (amountLike ? 'right' : 'left'),
-      bold: resolveOverlayBold(field, display || source),
+      bold,
     });
   }
 

@@ -288,6 +288,7 @@ export function PdfPageCanvas({
               }}
             >
               <Image
+                key={page.imageUri}
                 source={{
                   uri: page.imageUri,
                   ...(page.imageWidth && page.imageHeight
@@ -299,7 +300,7 @@ export function PdfPageCanvas({
                   height: heightPx,
                   borderRadius: AppDesign.radius.md,
                 }}
-                resizeMode="contain"
+                resizeMode="stretch"
                 fadeDuration={0}
               />
             </Pressable>

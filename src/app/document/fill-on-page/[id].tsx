@@ -184,16 +184,23 @@ export default function FillOnPageScreen() {
   /** Working PDF baked like Preview — when set, page images match export. */
   const [displayPdfUri, setDisplayPdfUri] = useState<string | null>(null);
   const [rasterSynced, setRasterSynced] = useState(false);
-  const [allowDetection, setAllowDetection] = useState(true);
+  type RasterPhase = 'warmup' | 'display' | 'detect';
+  const [rasterPhase, setRasterPhase] = useState<RasterPhase>('warmup');
+  const [runGeneration, setRunGeneration] = useState(0);
   /** Re-bake in progress while old page images stay on screen. */
   const [rasterRefreshing, setRasterRefreshing] = useState(false);
   const promptedNoFieldsRef = useRef(false);
   const draftRef = useRef<Document | null>(null);
   const pendingRasterSyncRef = useRef(false);
   const hasPagesRef = useRef(false);
+  const needsFieldDetectionRef = useRef(false);
+  const rasterPhaseRef = useRef<RasterPhase>('warmup');
+  const displayPdfUriRef = useRef<string | null>(null);
 
   draftRef.current = draft;
   hasPagesRef.current = pages.length > 0;
+  rasterPhaseRef.current = rasterPhase;
+  displayPdfUriRef.current = displayPdfUri;
 
   const bakeKey = useMemo(() => {
     if (!draft) {
@@ -253,7 +260,9 @@ export default function FillOnPageScreen() {
           }
           pendingRasterSyncRef.current = true;
           setDisplayPdfUri(uri);
-          setAllowDetection(false);
+          rasterPhaseRef.current = 'display';
+          setRasterPhase('display');
+          setRunGeneration((value) => value + 1);
           setRasterizing(true);
         } catch (error) {
           console.warn('[fill] preview bake failed', error);
@@ -316,7 +325,13 @@ export default function FillOnPageScreen() {
             setRasterSynced(false);
             setRasterRefreshing(false);
             pendingRasterSyncRef.current = false;
-            setAllowDetection(true);
+            const hasDetectedFields = (withFont.formFields ?? []).some(
+              (field) => field.origin === 'detected' && field.rect
+            );
+            needsFieldDetectionRef.current = !hasDetectedFields;
+            rasterPhaseRef.current = 'warmup';
+            setRasterPhase('warmup');
+            setRunGeneration(0);
             setRasterizing(true);
           }
         } finally {
@@ -461,7 +476,6 @@ export default function FillOnPageScreen() {
             ? {
                 ...field,
                 value: nextValue,
-                bold: resolveOverlayBold(field, nextValue),
                 fontFamily: normalizeOverlayFontId(
                   field.fontFamily ??
                     (looksLikeNumericValue(nextValue) ||
@@ -665,7 +679,15 @@ export default function FillOnPageScreen() {
 
   return (
     <GestureHandlerRootView style={styles.flex}>
-      <ThemedView style={styles.flex}>
+      <ThemedView
+        style={styles.flex}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          if (width > 0) {
+            setContentWidth(width);
+          }
+        }}
+      >
         <Stack.Screen
           options={{
             title: t('import.fillOnDocument'),
@@ -718,10 +740,7 @@ export default function FillOnPageScreen() {
             <LoadingState label={t('import.rasterizing')} />
           </View>
         ) : pages.length > 0 ? (
-          <View
-            style={styles.pageStage}
-            onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
-          >
+          <View style={styles.pageStage}>
             {rasterRefreshing ? (
               <View style={styles.refreshOverlay}>
                 <LoadingState label={t('import.rasterizing')} />
@@ -831,7 +850,7 @@ export default function FillOnPageScreen() {
                           )}
                           scale={layout.scale}
                           align={field.align ?? 'left'}
-                          bold={resolveOverlayBold(field, overlay.text || field.sourceText || '')}
+                          bold={resolveOverlayBold(field)}
                           fontFamily={normalizeOverlayFontId(
                             field.fontFamily ??
                               (looksLikeNumericValue(overlay.text) ||
@@ -975,27 +994,47 @@ export default function FillOnPageScreen() {
           </KeyboardAwareModalFrame>
         </Modal>
 
-        {rasterizing ? (
+        {rasterizing && contentWidth > 0 ? (
           <PdfPageRasterizer
             key={displayPdfUri ?? document.originalPdfUri}
             pdfUri={displayPdfUri ?? document.originalPdfUri}
-            detectFields={allowDetection && !displayPdfUri}
+            runGeneration={runGeneration}
+            cssWidth={contentWidth}
+            detectFields={rasterPhase === 'detect'}
+            emitPages={rasterPhase === 'display'}
             onPage={(nextPages) => {
-              // Initial load: stream pages in. Refresh: keep old images until complete.
-              if (!hasPagesRef.current) {
+              if (rasterPhaseRef.current === 'display') {
                 setPages(nextPages);
               }
             }}
             onDetectedFields={(detected) => {
-              setAllowDetection(false);
               void handleDetectedFields(detected);
             }}
             onComplete={(nextPages) => {
-              // Update bitmaps while the opaque cover still hides the stage.
-              setPages(nextPages);
+              if (rasterPhaseRef.current === 'warmup') {
+                rasterPhaseRef.current = 'display';
+                setRasterPhase('display');
+                setRunGeneration((value) => value + 1);
+                return;
+              }
+
+              if (
+                rasterPhaseRef.current === 'display' &&
+                needsFieldDetectionRef.current &&
+                !displayPdfUriRef.current
+              ) {
+                rasterPhaseRef.current = 'detect';
+                setRasterPhase('detect');
+                setRunGeneration((value) => value + 1);
+                return;
+              }
+
+              if (rasterPhaseRef.current === 'display') {
+                setPages(nextPages);
+              }
+
               setRasterizing(false);
               setRasterSynced(pendingRasterSyncRef.current);
-              // Let RN Image decode before revealing — avoids the post-apply blink.
               setTimeout(() => {
                 setRasterRefreshing(false);
               }, 280);

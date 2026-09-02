@@ -4,6 +4,22 @@ import type { PdfFormField } from '@/types/document';
 /** Dash placeholders used in Ukrainian/Russian financial tables. */
 const DASH_PLACEHOLDER = /^[-–—−]$/;
 
+export function isDashPlaceholder(value: string): boolean {
+  return DASH_PLACEHOLDER.test(value.trim());
+}
+
+/**
+ * Use the tiny dash wipe only when clearing a dash or replacing it with another dash.
+ * Replacing "-" with "2 219 522" needs a full cell cover.
+ */
+export function shouldUseDashOnlyWipe(source: string, newText: string): boolean {
+  if (!isDashPlaceholder(source)) {
+    return false;
+  }
+  const next = newText.trim();
+  return !next || isDashPlaceholder(next);
+}
+
 /**
  * True for plain numeric cell values (amounts, quantities) including
  * space-grouped forms like "226 694" and dash placeholders.
@@ -145,27 +161,18 @@ export function capOverlayFontSize(fontSize: number, rectHeight: number): number
 }
 
 /**
- * Amount cells sometimes share a PDF font id with bold row codes, which used
- * to cause every numeric value to be forced non-bold. That over-corrected:
- * bold total/subtotal rows in financial tables are common and legitimately
- * bold in BOTH columns — suppressing it made the edited cell visibly lighter
- * than its untouched neighbor. Only short row-code-shaped numbers (the actual
- * false-positive case) get de-bolded now; real amounts keep the detected weight.
- * Long form values (enterprise names, addresses) are also regular weight.
+ * Whether overlay/export text should use bold — follows the original printed
+ * cell weight (field.bold from detection), not the newly typed value.
  */
-export function resolveOverlayBold(
-  field: Pick<PdfFormField, 'bold' | 'sourceText'>,
-  value: string
-): boolean {
+export function resolveOverlayBold(field: Pick<PdfFormField, 'bold' | 'sourceText'>): boolean {
   if (!field.bold) {
     return false;
   }
-  const sample = (value || field.sourceText || '').trim();
-  if (looksLikeNumericValue(sample) && looksLikeRowCode(sample)) {
+  const source = (field.sourceText || '').trim();
+  if (looksLikeNumericValue(source) && looksLikeRowCode(source)) {
     return false;
   }
-  // Body lines / titles — not short section headers.
-  if (!looksLikeNumericValue(sample) && sample.length > 24) {
+  if (!looksLikeNumericValue(source) && source.length > 24) {
     return false;
   }
   return true;

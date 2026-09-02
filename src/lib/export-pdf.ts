@@ -175,9 +175,8 @@ async function buildImportedFormPdf(document: Document): Promise<Uint8Array> {
     console.log('[export] MuPDF redact skipped — no changed sourceText fields');
   }
 
-  // Always paint a cover when replacing glyphs. Even after a successful MuPDF
-  // pass this is a no-op on white paper, and it prevents "double text" if
-  // redaction missed a glyph run / scanned pixels.
+  // Always whiteout when replacing printed glyphs — MuPDF may miss a run,
+  // and skipWhiteout caused visible double-print on amount cells.
   pdfBytes = await drawDocumentOverlays(pdfBytes, document, {
     skipWhiteout: false,
   });

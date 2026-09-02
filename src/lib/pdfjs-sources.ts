@@ -2,7 +2,7 @@ import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 
 /** Bump when rasterizer HTML/JS wiring changes so devices pick up a fresh runtime. */
-const PDFJS_DIR = `${FileSystem.cacheDirectory}pdfjs-runtime-v17/`;
+const PDFJS_DIR = `${FileSystem.cacheDirectory}pdfjs-runtime-v22/`;
 
 let scriptsPromise: Promise<void> | null = null;
 
@@ -65,6 +65,41 @@ function buildRasterizerHtml(): string {
             window.ReactNativeWebView.postMessage(JSON.stringify(payload));
           }
         } catch (err) {}
+      }
+
+      /** WebView postMessage limits — split large JPEG base64 payloads. */
+      function postPageImage(pageIndex, total, widthPt, heightPt, widthPx, heightPx, dataUri, runId) {
+        var MAX_CHARS = 650000;
+        if (dataUri.length <= MAX_CHARS) {
+          post({
+            type: 'page',
+            pageIndex: pageIndex,
+            total: total,
+            widthPt: widthPt,
+            heightPt: heightPt,
+            imageWidth: widthPx,
+            imageHeight: heightPx,
+            dataUri: dataUri,
+            runId: runId
+          });
+          return;
+        }
+        var chunkCount = Math.ceil(dataUri.length / MAX_CHARS);
+        for (var c = 0; c < chunkCount; c++) {
+          post({
+            type: 'pageChunk',
+            pageIndex: pageIndex,
+            total: total,
+            widthPt: widthPt,
+            heightPt: heightPt,
+            imageWidth: widthPx,
+            imageHeight: heightPx,
+            chunkIndex: c,
+            chunkCount: chunkCount,
+            data: dataUri.slice(c * MAX_CHARS, (c + 1) * MAX_CHARS),
+            runId: runId
+          });
+        }
       }
 
       function fail(err) {
@@ -510,11 +545,6 @@ function buildRasterizerHtml(): string {
           fontSize = Math.min(fontSize, Math.max(5, rect.height * 0.85));
         }
         var bold = chars > 0 && boldChars >= chars * 0.4;
-        // Amounts / dashes in tables are regular weight even when they share a
-        // font id with bold row codes.
-        if (looksLikeAmountText(text)) {
-          bold = false;
-        }
         // Long form values (enterprise names, etc.) are body text, not headers.
         if (text.length > 24) {
           bold = false;
@@ -728,18 +758,19 @@ function buildRasterizerHtml(): string {
           return;
         }
 
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
 
         window.__startRaster__ = function (pdfPath, opts) {
           setStatus('loading pdf');
           var detected = [];
           opts = opts || {};
+          var runId = Number(opts.runId) || 0;
           var detectFields = opts.detectFields !== false;
-          // Target sharp display on modern phone DPI (small table text needs headroom).
+          var emitPages = opts.emitPages !== false;
           var cssWidth = Number(opts.cssWidth) || 390;
-          var dpr = Number(opts.dpr) || 2;
-          var targetPx = cssWidth * Math.max(dpr, 2) * 1.65;
+          var dpr = Math.max(Number(opts.dpr) || 2, 2);
+          // ~2× supersampling over screen pixels; cap to keep postMessage under WebView limits.
+          var desiredWidthPx = Math.min(2400, Math.round(cssWidth * dpr * 2));
 
           loadArrayBuffer(pdfPath || './document.pdf')
             .then(function (buffer) {
@@ -753,10 +784,10 @@ function buildRasterizerHtml(): string {
               function next() {
                 if (index > total) {
                   if (detectFields) {
-                    post({ type: 'detectedFields', fields: detected });
+                    post({ type: 'detectedFields', fields: detected, runId: runId });
                   }
                   setStatus('done');
-                  post({ type: 'done', total: total });
+                  post({ type: 'done', total: total, runId: runId });
                   return;
                 }
 
@@ -765,7 +796,7 @@ function buildRasterizerHtml(): string {
 
                 pdf.getPage(index).then(function (page) {
                   var base = page.getViewport({ scale: 1 });
-                  var scale = Math.min(4.5, Math.max(3.0, targetPx / base.width));
+                  var scale = Math.max(1.5, desiredWidthPx / base.width);
                   var viewport = page.getViewport({ scale: scale });
                   var canvas = document.createElement('canvas');
                   var widthPx = Math.floor(viewport.width);
@@ -780,21 +811,22 @@ function buildRasterizerHtml(): string {
                     fail(new Error('canvas context missing'));
                     return null;
                   }
-                  ctx.imageSmoothingEnabled = false;
 
                   return page.render({ canvasContext: ctx, viewport: viewport }).promise
                     .then(function () {
-                      var dataUri = canvas.toDataURL('image/jpeg', 0.97);
-                      post({
-                        type: 'page',
-                        pageIndex: index - 1,
-                        total: total,
-                        widthPt: base.width,
-                        heightPt: base.height,
-                        imageWidth: widthPx,
-                        imageHeight: heightPx,
-                        dataUri: dataUri
-                      });
+                      if (emitPages) {
+                        var dataUri = canvas.toDataURL('image/jpeg', 0.92);
+                        postPageImage(
+                          index - 1,
+                          total,
+                          base.width,
+                          base.height,
+                          widthPx,
+                          heightPx,
+                          dataUri,
+                          runId
+                        );
+                      }
                       if (canvas.parentNode) {
                         canvas.parentNode.removeChild(canvas);
                       }

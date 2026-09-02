@@ -50,7 +50,11 @@ export function detectedFieldsToFormFields(
     // (sharing a font id with bold headers). Genuine amounts — e.g. bold
     // total/subtotal rows — should keep the font's real detected weight.
     const rowCodeLike = amountLike && looksLikeRowCode(sample);
-    const bold = rowCodeLike ? false : item.bold === true;
+    const detectedBold = rowCodeLike ? false : item.bold === true;
+    const sourceUnchanged =
+      matched?.sourceText != null &&
+      matched.sourceText === (item.value?.trim() || matched.sourceText);
+    const bold = sourceUnchanged && matched?.bold != null ? matched.bold : detectedBold;
 
     return {
       name,

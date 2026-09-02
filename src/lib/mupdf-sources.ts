@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy';
  * MuPDF.js WASM runtime for native PDF redaction (AGPL-3.0-or-later).
  * See assets/mupdf/AGPL-NOTICE.txt before shipping a closed-source build.
  */
-const MUPDF_DIR = `${FileSystem.cacheDirectory}mupdf-runtime-v6/`;
+const MUPDF_DIR = `${FileSystem.cacheDirectory}mupdf-runtime-v8/`;
 
 let scriptsPromise: Promise<void> | null = null;
 
@@ -266,16 +266,20 @@ function buildProcessorHtml(): string {
                   redacted += 1;
                 }
               }
+              // Text-only forms: never touch image pixels — REDACT_IMAGE_PIXELS
+              // rewrites overlapping images and degrades table lines / backgrounds.
               page.applyRedactions(
                 false,
-                PDFPage.REDACT_IMAGE_PIXELS,
+                PDFPage.REDACT_IMAGE_NONE,
                 PDFPage.REDACT_LINE_ART_NONE,
                 PDFPage.REDACT_TEXT_REMOVE
               );
               try { page.destroy(); } catch (e0) {}
             }
 
-            var out = pdf.saveToBuffer('garbage=compact');
+            // Incremental save keeps untouched streams/fonts as in the source PDF.
+            var saveOpts = pdf.canBeSavedIncrementally() ? 'incremental' : '';
+            var out = pdf.saveToBuffer(saveOpts);
             var bytes = out.asUint8Array();
             setLog('done bytes=' + bytes.length + ' redacts=' + redacted);
             post({

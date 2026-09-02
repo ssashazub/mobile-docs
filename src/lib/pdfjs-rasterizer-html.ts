@@ -10,6 +10,20 @@ export type RasterPageMessage =
       imageWidth?: number;
       imageHeight?: number;
       dataUri: string;
+      runId?: number;
+    }
+  | {
+      type: 'pageChunk';
+      pageIndex: number;
+      total: number;
+      widthPt: number;
+      heightPt: number;
+      imageWidth?: number;
+      imageHeight?: number;
+      chunkIndex: number;
+      chunkCount: number;
+      data: string;
+      runId?: number;
     }
   | {
       type: 'detectedFields';
@@ -26,9 +40,10 @@ export type RasterPageMessage =
         align?: 'left' | 'center' | 'right';
         fontFamily?: 'times' | 'arial' | 'georgia' | 'courier';
       }>;
+      runId?: number;
     }
-  | { type: 'done'; total: number }
-  | { type: 'error'; message: string };
+  | { type: 'done'; total: number; runId?: number }
+  | { type: 'error'; message: string; runId?: number };
 
 export type DetectedPdfField = {
   pageIndex: number;

@@ -18,32 +18,44 @@ export type RasterizedPage = {
 
 type PdfPageRasterizerProps = {
   pdfUri: string;
+  /** Bump to re-run raster in the same WebView (warmup → display → detect). */
+  runGeneration?: number;
   onComplete: (pages: RasterizedPage[]) => void;
   onError: (message: string) => void;
   onPage?: (pages: RasterizedPage[], done: number, total: number) => void;
   onDetectedFields?: (fields: DetectedPdfField[]) => void;
-  /** When false, only rasterize pages (used after baking edits into a working PDF). */
   detectFields?: boolean;
+  emitPages?: boolean;
+  cssWidth?: number;
 };
 
 const RASTER_TIMEOUT_MS = 90000;
 
 export function PdfPageRasterizer({
   pdfUri,
+  runGeneration = 0,
   onComplete,
   onError,
   onPage,
   onDetectedFields,
   detectFields = true,
+  emitPages = true,
+  cssWidth,
 }: PdfPageRasterizerProps) {
   const webRef = useRef<WebView>(null);
   const pagesRef = useRef<RasterizedPage[]>([]);
+  const pageChunksRef = useRef<
+    Map<number, { parts: string[]; chunkCount: number; meta: RasterPageMessage | null }>
+  >(new Map());
   const readyRef = useRef(false);
-  const startedRef = useRef(false);
-  const finishedRef = useRef(false);
+  const activeRunRef = useRef(runGeneration);
   const runtimeDirRef = useRef<string | null>(null);
   const detectFieldsRef = useRef(detectFields);
   detectFieldsRef.current = detectFields;
+  const emitPagesRef = useRef(emitPages);
+  emitPagesRef.current = emitPages;
+  const cssWidthRef = useRef(cssWidth);
+  cssWidthRef.current = cssWidth;
 
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
@@ -57,18 +69,35 @@ export function PdfPageRasterizer({
   const [htmlUri, setHtmlUri] = useState<string | null>(null);
   const [webKey, setWebKey] = useState(0);
 
-  const startIfReady = useCallback(() => {
-    if (!readyRef.current || startedRef.current) {
+  const isActiveRun = useCallback((runId?: number) => {
+    return runId == null || runId === activeRunRef.current;
+  }, []);
+
+  const startRaster = useCallback(() => {
+    if (!readyRef.current) {
       return;
     }
-    startedRef.current = true;
-    const cssWidth = Math.round(Dimensions.get('window').width);
+
+    activeRunRef.current = runGeneration;
+    pageChunksRef.current.clear();
+    if (emitPagesRef.current) {
+      pagesRef.current = [];
+    }
+
+    const width =
+      cssWidthRef.current != null && cssWidthRef.current > 0
+        ? Math.round(cssWidthRef.current)
+        : Math.round(Dimensions.get('window').width);
     const dpr = PixelRatio.get();
     const detect = detectFieldsRef.current ? 'true' : 'false';
-    webRef.current?.injectJavaScript(
-      `try { window.__startRaster__('./document.pdf', { cssWidth: ${cssWidth}, dpr: ${dpr}, detectFields: ${detect} }); } catch (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: String(e && e.message ? e.message : e) })); } true;`
-    );
-  }, []);
+    const emit = emitPagesRef.current ? 'true' : 'false';
+
+    setTimeout(() => {
+      webRef.current?.injectJavaScript(
+        `try { window.__startRaster__('./document.pdf', { cssWidth: ${width}, dpr: ${dpr}, detectFields: ${detect}, emitPages: ${emit}, runId: ${runGeneration} }); } catch (e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: String(e && e.message ? e.message : e), runId: ${runGeneration} })); } true;`
+      );
+    }, 150);
+  }, [runGeneration]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,9 +106,8 @@ export function PdfPageRasterizer({
     const prepare = async () => {
       try {
         readyRef.current = false;
-        startedRef.current = false;
-        finishedRef.current = false;
         pagesRef.current = [];
+        pageChunksRef.current.clear();
         setHtmlUri(null);
 
         const [runtime, bytes] = await Promise.all([
@@ -102,7 +130,7 @@ export function PdfPageRasterizer({
         setWebKey((value) => value + 1);
 
         timeoutId = setTimeout(() => {
-          if (!cancelled && !finishedRef.current && pagesRef.current.length === 0) {
+          if (!cancelled && pagesRef.current.length === 0 && emitPagesRef.current) {
             onErrorRef.current('PDF rasterization timed out');
           }
         }, RASTER_TIMEOUT_MS);
@@ -123,6 +151,51 @@ export function PdfPageRasterizer({
     };
   }, [pdfUri]);
 
+  useEffect(() => {
+    if (htmlUri && readyRef.current) {
+      startRaster();
+    }
+  }, [htmlUri, runGeneration, detectFields, emitPages, cssWidth, startRaster]);
+
+  const savePageImage = useCallback(
+    async (
+      pageIndex: number,
+      total: number,
+      widthPt: number,
+      heightPt: number,
+      dataUri: string,
+      imageWidth?: number,
+      imageHeight?: number
+    ) => {
+      const cacheDir = `${FileSystem.cacheDirectory}pdf-pages/`;
+      const dirInfo = await FileSystem.getInfoAsync(cacheDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(cacheDir, { intermediates: true });
+      }
+
+      const base64 = dataUri.replace(/^data:image\/\w+;base64,/, '');
+      const imageUri = `${cacheDir}${Date.now()}-${pageIndex}.jpg`;
+      await FileSystem.writeAsStringAsync(imageUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      pagesRef.current = [
+        ...pagesRef.current.filter((page) => page.pageIndex !== pageIndex),
+        {
+          pageIndex,
+          widthPt,
+          heightPt,
+          imageUri,
+          imageWidth,
+          imageHeight,
+        },
+      ].sort((a, b) => a.pageIndex - b.pageIndex);
+
+      onPageRef.current?.(pagesRef.current, pageIndex + 1, total);
+    },
+    []
+  );
+
   const handleMessage = useCallback(
     async (event: WebViewMessageEvent) => {
       let message: RasterPageMessage;
@@ -134,11 +207,14 @@ export function PdfPageRasterizer({
 
       if (message.type === 'ready') {
         readyRef.current = true;
-        startIfReady();
+        startRaster();
         return;
       }
 
       if (message.type === 'error') {
+        if (!isActiveRun(message.runId)) {
+          return;
+        }
         onErrorRef.current(message.message);
         return;
       }
@@ -148,37 +224,63 @@ export function PdfPageRasterizer({
       }
 
       if (message.type === 'detectedFields') {
+        if (!isActiveRun(message.runId)) {
+          return;
+        }
         onDetectedFieldsRef.current?.(message.fields);
         return;
       }
 
-      if (message.type === 'page') {
+      if (message.type === 'pageChunk') {
+        if (!isActiveRun(message.runId)) {
+          return;
+        }
         try {
-          const cacheDir = `${FileSystem.cacheDirectory}pdf-pages/`;
-          const dirInfo = await FileSystem.getInfoAsync(cacheDir);
-          if (!dirInfo.exists) {
-            await FileSystem.makeDirectoryAsync(cacheDir, { intermediates: true });
+          const existing = pageChunksRef.current.get(message.pageIndex) ?? {
+            parts: new Array(message.chunkCount).fill(''),
+            chunkCount: message.chunkCount,
+            meta: null,
+          };
+          existing.parts[message.chunkIndex] = message.data;
+          existing.meta = message;
+          pageChunksRef.current.set(message.pageIndex, existing);
+
+          const ready = existing.parts.every((part) => part.length > 0);
+          if (!ready || !existing.meta) {
+            return;
           }
 
-          const base64 = message.dataUri.replace(/^data:image\/\w+;base64,/, '');
-          const imageUri = `${cacheDir}${Date.now()}-${message.pageIndex}.jpg`;
-          await FileSystem.writeAsStringAsync(imageUri, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          const dataUri = existing.parts.join('');
+          pageChunksRef.current.delete(message.pageIndex);
+          await savePageImage(
+            message.pageIndex,
+            message.total,
+            message.widthPt,
+            message.heightPt,
+            dataUri,
+            message.imageWidth,
+            message.imageHeight
+          );
+        } catch (error) {
+          onErrorRef.current(error instanceof Error ? error.message : String(error));
+        }
+        return;
+      }
 
-          pagesRef.current = [
-            ...pagesRef.current.filter((page) => page.pageIndex !== message.pageIndex),
-            {
-              pageIndex: message.pageIndex,
-              widthPt: message.widthPt,
-              heightPt: message.heightPt,
-              imageUri,
-              imageWidth: message.imageWidth,
-              imageHeight: message.imageHeight,
-            },
-          ].sort((a, b) => a.pageIndex - b.pageIndex);
-
-          onPageRef.current?.(pagesRef.current, message.pageIndex + 1, message.total);
+      if (message.type === 'page') {
+        if (!isActiveRun(message.runId)) {
+          return;
+        }
+        try {
+          await savePageImage(
+            message.pageIndex,
+            message.total,
+            message.widthPt,
+            message.heightPt,
+            message.dataUri,
+            message.imageWidth,
+            message.imageHeight
+          );
         } catch (error) {
           onErrorRef.current(error instanceof Error ? error.message : String(error));
         }
@@ -186,11 +288,13 @@ export function PdfPageRasterizer({
       }
 
       if (message.type === 'done') {
-        finishedRef.current = true;
+        if (!isActiveRun(message.runId)) {
+          return;
+        }
         onCompleteRef.current(pagesRef.current);
       }
     },
-    [startIfReady]
+    [isActiveRun, savePageImage, startRaster]
   );
 
   if (!htmlUri) {
@@ -211,9 +315,6 @@ export function PdfPageRasterizer({
         allowUniversalAccessFromFileURLs
         allowingReadAccessToURL={runtimeDirRef.current ?? undefined}
         mixedContentMode="always"
-        onLoadEnd={() => {
-          startIfReady();
-        }}
         onMessage={handleMessage}
         onError={(event) => {
           onErrorRef.current(event.nativeEvent.description || 'WebView failed to load');
@@ -222,7 +323,7 @@ export function PdfPageRasterizer({
           onErrorRef.current('WebView HTTP error while loading PDF.js');
         }}
         style={styles.webview}
-        {...(Platform.OS === 'android' ? { androidLayerType: 'hardware' as const } : null)}
+        {...(Platform.OS === 'android' ? { androidLayerType: 'software' as const } : null)}
       />
     </View>
   );
@@ -231,11 +332,10 @@ export function PdfPageRasterizer({
 const styles = StyleSheet.create({
   host: {
     position: 'absolute',
-    // Keep a large off-screen surface so mobile WebViews don't clamp canvas buffers.
     left: -5000,
     top: 0,
-    width: 2400,
-    height: 3400,
+    width: 4096,
+    height: 5200,
     opacity: 1,
     zIndex: -1,
   },

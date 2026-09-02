@@ -1,8 +1,10 @@
 import { coverPdfRectInsideCell } from '@/lib/glyph-cover';
 import {
   formatOverlayDisplayValue,
+  isDashPlaceholder,
   looksLikeNumericValue,
   numericValuesEqual,
+  shouldUseDashOnlyWipe,
 } from '@/lib/overlay-text-format';
 import { isCheckboxChecked } from '@/lib/pdf-form';
 import type { Document, PdfFieldRect, PdfFormField } from '@/types/document';
@@ -106,14 +108,16 @@ export function collectMupdfRedactRects(document: Document): MupdfRedactRect[] {
     });
     const amountLike = isLatinAmountText(display || source);
     const align = field.align ?? (amountLike ? 'right' : 'left');
+    const dashOnly = shouldUseDashOnlyWipe(source, display);
 
-    const box = /^[-–—−]$/.test(source)
+    const box = dashOnly
       ? dashWipeRect(field.rect, align, field.fontSize)
       : fullCellWipeRect(field.rect);
 
     rects.push({
       ...box,
-      searchText: source,
+      // Skip dash search when filling a number — otherwise only the dash glyph is redacted.
+      searchText: dashOnly ? source : isDashPlaceholder(source) ? undefined : source,
     });
   }
 
