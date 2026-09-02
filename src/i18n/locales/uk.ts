@@ -342,5 +342,22 @@ export const uk: TranslationSchema = {
     termsPoint4: 'Документи не зберігаються в хмарі самим застосунком.',
     termsPoint5:
       'Ви відповідаєте за документи, які створюєте, імпортуєте, експортуєте чи надсилаєте, і за дотримання законів під час використання застосунку.',
+    openSource: 'Відкритий код',
+    openSourceTitle: 'Відкритий код і ліцензії',
+    openSourceIntro:
+      'Mobile Docs — вільне ПЗ під ліцензією GNU Affero General Public License v3.0 або новішою, бо застосунок містить MuPDF.js. Ви можете використовувати, вивчати, змінювати та поширювати застосунок на тих самих умовах.',
+    openSourceAppLicenseTitle: 'Ліцензія застосунку',
+    openSourceAppLicenseText:
+      'Повний вихідний код застосунку опубліковано в інтернеті. Кожен реліз у магазині відповідає тегу в репозиторії. Копіювання, зміни та поширення — на умовах AGPL-3.0-or-later.',
+    openSourceMupdfTitle: 'MuPDF.js (Artifex)',
+    openSourceMupdfText:
+      'Для redaction PDF використовується MuPDF.js (WebAssembly) від Artifex Software — також під AGPL-3.0-or-later. Поширення застосунку з MuPDF вимагає публікації відповідних вихідників або комерційної ліцензії Artifex.',
+    openSourceLinksTitle: 'Посилання',
+    openSourceCode: 'Вихідний код',
+    openSourceLicense: 'Ліцензія (AGPL)',
+    openSourceMupdfLicense: 'MuPDF / текст AGPL',
+    openSourceLibrariesTitle: 'Сторонні бібліотеки',
+    openSourceFooter:
+      'Відповідні вихідники за адресою {{url}} мають залишатися публічно доступними, поки ви поширюєте цей застосунок під AGPL.',
   },
 };

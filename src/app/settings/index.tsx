@@ -532,6 +532,14 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <SettingsRow
+            label={t('settings.openSource')}
+            icon={{ ios: 'chevron.left.forwardchevron.right', android: 'code', web: 'code' }}
+            onPress={() => router.push('/settings/open-source' as Href)}
+            styles={styles}
+            colors={colors}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
             label={t('settings.feedback')}
             icon={{ ios: 'envelope.fill', android: 'mail', web: 'mail' }}
             onPress={() => {

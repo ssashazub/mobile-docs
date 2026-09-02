@@ -332,5 +332,18 @@ export type TranslationSchema = {
     termsPoint3: string;
     termsPoint4: string;
     termsPoint5: string;
+    openSource: string;
+    openSourceTitle: string;
+    openSourceIntro: string;
+    openSourceAppLicenseTitle: string;
+    openSourceAppLicenseText: string;
+    openSourceMupdfTitle: string;
+    openSourceMupdfText: string;
+    openSourceLinksTitle: string;
+    openSourceCode: string;
+    openSourceLicense: string;
+    openSourceMupdfLicense: string;
+    openSourceLibrariesTitle: string;
+    openSourceFooter: string;
   };
 };

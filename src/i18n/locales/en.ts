@@ -349,5 +349,22 @@ export const en: TranslationSchema = {
         termsPoint4: 'Documents are not stored in the cloud by the app itself.',
         termsPoint5:
           'You are responsible for documents you create, import, export, or share, and for complying with applicable laws when using the app.',
+        openSource: 'Open source',
+        openSourceTitle: 'Open source & licenses',
+        openSourceIntro:
+          'Mobile Docs is free software released under the GNU Affero General Public License v3.0 or later because it includes MuPDF.js. You may use, study, modify, and redistribute the app under the same license.',
+        openSourceAppLicenseTitle: 'Application license',
+        openSourceAppLicenseText:
+          'The complete source code for this app is published online. Each store release corresponds to a tagged version in the repository. You may copy, modify, and redistribute the software under AGPL-3.0-or-later.',
+        openSourceMupdfTitle: 'MuPDF.js (Artifex)',
+        openSourceMupdfText:
+          'PDF redaction uses MuPDF.js (WebAssembly) from Artifex Software, also licensed under AGPL-3.0-or-later. Using MuPDF in a distributed app requires publishing your corresponding source or obtaining a commercial license from Artifex.',
+        openSourceLinksTitle: 'Links',
+        openSourceCode: 'Source code',
+        openSourceLicense: 'License (AGPL)',
+        openSourceMupdfLicense: 'MuPDF / AGPL text',
+        openSourceLibrariesTitle: 'Third-party libraries',
+        openSourceFooter:
+          'Corresponding source for version {{url}} must remain publicly available for as long as you distribute this app under AGPL.',
     },
 };

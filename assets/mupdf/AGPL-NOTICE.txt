@@ -1,8 +1,23 @@
-MuPDF.js (Artifex) is licensed under AGPL-3.0-or-later.
+MuPDF.js (Artifex) — GNU AGPL v3.0 or later
+============================================
 
-Using these files in a closed-source App Store / Play Store app without an
-Artifex commercial license requires releasing your entire application under
-a compatible open-source license (AGPL obligations).
+This application includes MuPDF.js WebAssembly for PDF redaction.
 
-Commercial licensing: https://artifex.com/contact/mupdf-js
-AGPL text: https://www.gnu.org/licenses/agpl-3.0.html
+Copyright (C) Artifex Software, Inc.
+License: https://www.gnu.org/licenses/agpl-3.0.html
+Upstream: https://github.com/ArtifexSoftware/mupdf.js
+
+AGPL compliance for Mobile Docs
+-------------------------------
+
+Because MuPDF.js is AGPL-licensed, the entire Mobile Docs application is
+distributed under AGPL-3.0-or-later (see LICENSE in the repository root).
+
+To distribute this app legally without a commercial Artifex license you must:
+
+1. Publish the complete corresponding source code (same version as the store build).
+2. License your application under AGPL-3.0-or-later.
+3. Keep source available for at least three years after each distribution.
+4. Show users how to obtain source (Settings → Open source in the app).
+
+Commercial licensing (optional): https://artifex.com/contact/mupdf-js

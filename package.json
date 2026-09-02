@@ -2,6 +2,7 @@
   "name": "mobile-docs",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@expo/ui": "~56.0.23",
     "@pdf-lib/fontkit": "^1.1.1",

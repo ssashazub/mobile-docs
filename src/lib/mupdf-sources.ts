@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * MuPDF.js WASM runtime for native PDF redaction (AGPL-3.0-or-later).
- * See assets/mupdf/AGPL-NOTICE.txt before shipping a closed-source build.
+ * The app is AGPL-licensed; see assets/mupdf/AGPL-NOTICE.txt and LICENSE.
  */
 const MUPDF_DIR = `${FileSystem.cacheDirectory}mupdf-runtime-v8/`;
 
